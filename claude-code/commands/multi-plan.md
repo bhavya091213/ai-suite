@@ -1,4 +1,5 @@
 # Plan - Multi-Model Collaborative Planning
+<!-- installer:requires codex -->
 
 Multi-model collaborative planning - Context retrieval + Dual-model analysis → Generate step-by-step implementation plan.
 

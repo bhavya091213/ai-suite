@@ -1,0 +1,127 @@
+{
+  "_comment": "External integrations the installer can detect and (on confirmation) install. Not skills: each runs a third-party installer or registers a plugin/MCP server. 'note' is informational.",
+  "extras": {
+    "impeccable": {
+      "title": "Impeccable - design vocabulary, refinement commands and design checks",
+      "category": "design",
+      "url": "https://impeccable.style/docs/",
+      "tools": [
+        "claude",
+        "codex"
+      ],
+      "install": [
+        "npx impeccable install"
+      ],
+      "after_install": {
+        "claude": "run /impeccable init in a project",
+        "codex": "run $impeccable in a project"
+      },
+      "detect": {
+        "any_paths": [
+          "~/.claude/skills/impeccable",
+          "~/.claude/commands/impeccable.md",
+          "~/.codex/skills/impeccable"
+        ]
+      }
+    },
+    "figma-mcp": {
+      "title": "Figma MCP - live canvas and FigJam access for the agent",
+      "category": "design",
+      "url": "https://help.figma.com/hc/en-us/articles/39888612464151",
+      "tools": [
+        "claude",
+        "codex"
+      ],
+      "install_by_tool": {
+        "claude": [
+          "claude plugin install figma@claude-plugins-official"
+        ],
+        "codex": [
+          "codex mcp add figma --url https://mcp.figma.com/mcp"
+        ]
+      },
+      "detect": {
+        "claude_mcp": "figma",
+        "codex_mcp": "figma",
+        "claude_plugin": "figma@claude-plugins-official"
+      }
+    },
+    "ppt-master": {
+      "title": "PPT Master - editable .pptx decks with native shapes, charts and brand templates",
+      "category": "presentations",
+      "url": "https://github.com/hugohe3/ppt-master",
+      "tools": [
+        "claude",
+        "codex"
+      ],
+      "install": [
+        "npx skills add hugohe3/ppt-master"
+      ],
+      "after_install": {
+        "claude": "restart Claude Code; pip install -r the skill's requirements.txt if you want its scripts",
+        "codex": "restart Codex so it re-reads ~/.codex/skills"
+      },
+      "detect": {
+        "any_paths": [
+          "~/.agents/skills/ppt-master",
+          "~/.claude/skills/ppt-master",
+          "~/.codex/skills/ppt-master"
+        ]
+      },
+      "note": "78 MB upstream (templates), so it is installed locally rather than vendored into this repo"
+    },
+    "presentation-skill": {
+      "title": "presentation-skill - Codex-native editable .pptx builder with layout and accessibility QA",
+      "category": "presentations",
+      "url": "https://github.com/sirilsengolraj-source/presentation-skill",
+      "tools": [
+        "codex",
+        "claude"
+      ],
+      "install": [
+        "npx skills add sirilsengolraj-source/presentation-skill"
+      ],
+      "after_install": {
+        "codex": "restart Codex; read its SKILL.md before running its scripts",
+        "claude": "restart Claude Code"
+      },
+      "detect": {
+        "any_paths": [
+          "~/.codex/skills/presentation-skill",
+          "~/.claude/skills/presentation-skill",
+          "~/.agents/skills/presentation-skill"
+        ]
+      },
+      "note": "95 MB upstream with many scripts, so it is installed locally rather than vendored into this repo"
+    },
+    "anthropic-pptx": {
+      "title": "Anthropic pptx skill - read, create and edit PowerPoint files",
+      "category": "presentations",
+      "url": "https://github.com/anthropics/skills/tree/main/skills/pptx",
+      "tools": [
+        "claude",
+        "codex"
+      ],
+      "install_by_tool": {
+        "claude": [
+          "npx skills add anthropics/skills --skill pptx --agent claude-code"
+        ],
+        "codex": [
+          "npx skills add anthropics/skills --skill pptx --agent codex"
+        ]
+      },
+      "after_install": {
+        "claude": "the Claude desktop app may already sync this skill; check Installed",
+        "codex": "restart Codex"
+      },
+      "detect": {
+        "any_paths": [
+          "~/.claude/skills/pptx",
+          "~/.codex/skills/pptx",
+          "~/.agents/skills/pptx"
+        ]
+      },
+      "note": "its LICENSE.txt forbids redistribution, so it is never vendored into this repo"
+    }
+  }
+}

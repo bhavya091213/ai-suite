@@ -1,0 +1,26 @@
+{
+  "_comment": "Central configuration for the ai-suite installer. Edit with ./install.sh (Settings tab) or ./install.sh skills config set <key> <value>. Keys are documented in docs/installer.md.",
+  "version": 1,
+  "tools": { "claude": "auto", "codex": "auto" },
+  "subagents": {
+    "claude": { "heavy": "opus", "light": "sonnet", "trivial": "haiku" },
+    "codex": { "model": "gpt-5.6-sol", "heavy": "xhigh", "light": "medium", "trivial": "low",
+               "max_threads": 6, "max_depth": 1 }
+  },
+  "review": { "adversarial": "auto" },
+  "guardrails": {
+    "never_delete": true,
+    "context_budget_tokens": 100000,
+    "preflight_checklist": true,
+    "plan_approval_gate": true,
+    "fix_approval_gate": true,
+    "hook_profile": "standard",
+    "disabled_hooks": []
+  },
+  "paths": {
+    "obsidian_vaults": [],
+    "sessions_dir": "~/.claude/sessions",
+    "backups_dir": "~/.agents/backups"
+  },
+  "editor": ""
+}

@@ -1,4 +1,5 @@
 # Frontend - Frontend-Focused Development
+<!-- installer:requires gemini -->
 
 Frontend-focused workflow (Research → Ideation → Plan → Execute → Optimize → Review), Gemini-led.
 

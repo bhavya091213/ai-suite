@@ -1,5 +1,5 @@
 {
-  "_comment": "SOURCE OF TRUTH for MCP servers shared by Claude Code and Codex CLI. Edit this file, then run ~/.agents/bin/sync-agents to render it into ~/.codex/config.toml ([mcp_servers.*] tables) and Claude Code's user-scope MCP list (via the `claude mcp` CLI). Never hand-edit ~/.claude.json - Claude Code rewrites it. Each entry: type stdio|http, command/args/env for stdio, url for http, and targets listing which tools should get it.",
+  "_comment": "SOURCE OF TRUTH for MCP servers shared by Claude Code and Codex CLI. Edit this file, then run ~/.agents/bin/sync-agents to render it into ~/.codex/config.toml ([mcp_servers.*] tables) and Claude Code's user-scope MCP list (via the `claude mcp` CLI). Never hand-edit ~/.claude.json - Claude Code rewrites it. Each entry: type stdio|http, command/args/env for stdio, url for http, and targets listing which tools should get it. Set \"enabled\": false on an entry to keep it listed but skip it when syncing (status shows it as disabled).",
   "servers": {
     "context7": {
       "type": "stdio",
@@ -11,6 +11,12 @@
       "type": "http",
       "url": "https://mcp.exa.ai/mcp",
       "targets": ["claude", "codex"]
+    },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "targets": ["claude", "codex"],
+      "enabled": false
     },
     "github": {
       "type": "stdio",

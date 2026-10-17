@@ -1,4 +1,5 @@
 # Workflow - Multi-Model Collaborative Development
+<!-- installer:requires-any codex gemini -->
 
 Multi-model collaborative development workflow (Research → Ideation → Plan → Execute → Optimize → Review), with intelligent routing: Frontend → Gemini, Backend → Codex.
 

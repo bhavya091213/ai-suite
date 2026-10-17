@@ -1,5 +1,5 @@
 ---
-name: configure-codex-toolkit
+name: configure-ecc
 description: Install, repair, or verify the migrated ECC/Claude workflows as Codex-native skills, prompt recipes, rules, scripts, and agent templates under ~/.codex or a project .codex directory.
 origin: ECC migrated to Codex
 ---

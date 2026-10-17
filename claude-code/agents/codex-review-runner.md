@@ -1,4 +1,5 @@
 ---
+# installer:requires codex
 name: codex-review-runner
 description: Thin runner for the Codex review pipeline used in Phase 3 (Adversarial Review) of the orchestrate skill. Invokes ~/.claude/scripts/codex-review-pipeline/cli.mjs so gpt-5.5 (high) hunts bugs, gpt-5.6-sol (xhigh) adjudicates complex findings, and gpt-5.6-sol implements a user-approved fix. Returns a compact status, never the raw findings. Exit 75 from the script means Codex is rate-limited, depleted, or unavailable and the orchestrator must fall back to Claude's own review.
 tools: ["Bash", "Read"]
@@ -26,7 +27,7 @@ Script: `node ~/.claude/scripts/codex-review-pipeline/cli.mjs <stage> [flags]`
 ## Hard rules
 
 - **Exactly one `Bash` call per assignment** running the script. Use a generous timeout (the stages can take many minutes; default script timeout is 25 minutes per stage). If the assignment says background, run it in the background and report the launch only.
-- **Never run `implement` unless the assignment quotes the user's explicit approval for that specific finding id.** If the approval text is missing, stop and say so.
+- **Never run `implement` unless the assignment carries an approval basis for that specific finding id:** the user's explicit approval for it, quoted, or — only when the orchestrator states the per-fix gate is disabled in `~/.agents/config.json` (`guardrails.fix_approval_gate: false`) — a quote of that setting plus the logged approved-by-default fix-list entry for that id, which covers `confirmed` findings only. A `needs-human` finding always needs the user's recorded decision, gate or no gate. If the approval basis is missing, stop and say so.
 - **Never pass `--force` unless the assignment says the user made the human decision and states what it was.**
 - Do not read `01-hunt.json` or `02-adjudicated.json` in full and paste them back. The orchestrator will hand the adjudicated file to `review-triage`. You may `Read` `status.json` if stdout was truncated.
 - Do not retry a run that exited 75. Report the fallback immediately.

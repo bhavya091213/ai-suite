@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""sync-agents - render ~/.agents/mcp-servers.json and ~/.agents/RULES.md into
-Claude Code and Codex CLI.
+"""sync-agents - render ~/.agents/mcp-servers.json, ~/.agents/RULES.md and
+~/.agents/LOCAL.md into Claude Code and Codex CLI.
 
 Source of truth:
-  ~/.agents/mcp-servers.json   MCP servers (both tools)
-  ~/.agents/RULES.md           shared rules text (Codex AGENTS.md block)
+  ~/.agents/mcp-servers.json   MCP servers (both tools); "enabled": false skips one
+  ~/.agents/RULES.md           shared rules text (Codex AGENTS.md SHARED block)
+  ~/.agents/LOCAL.md           personal rules text (Codex AGENTS.md LOCAL block, optional)
 
 Subcommands: mcp (default), rules, status.
 """
@@ -23,6 +24,7 @@ import tomllib
 HOME = os.path.expanduser("~")
 MCP_JSON = os.path.join(HOME, ".agents", "mcp-servers.json")
 RULES_MD = os.path.join(HOME, ".agents", "RULES.md")
+LOCAL_MD = os.path.join(HOME, ".agents", "LOCAL.md")
 CODEX_TOML = os.path.join(HOME, ".codex", "config.toml")
 CODEX_TOML_BAK = CODEX_TOML + ".bak-sync"
 CODEX_AGENTS = os.path.join(HOME, ".codex", "AGENTS.md")
@@ -30,6 +32,8 @@ CLAUDE_JSON = os.path.join(HOME, ".claude.json")
 
 BEGIN_MARK = "<!-- BEGIN SHARED RULES (synced from ~/.agents/RULES.md) -->"
 END_MARK = "<!-- END SHARED RULES -->"
+LOCAL_BEGIN_MARK = "<!-- BEGIN LOCAL RULES (synced from ~/.agents/LOCAL.md) -->"
+LOCAL_END_MARK = "<!-- END LOCAL RULES -->"
 
 TABLE_HEADER_RE = re.compile(r"^\[")
 
@@ -43,7 +47,13 @@ def die(msg: str, code: int = 1) -> None:
     sys.exit(code)
 
 
-def load_servers() -> dict:
+def is_enabled(spec: dict) -> bool:
+    return spec.get("enabled", True) is not False
+
+
+def load_servers(include_disabled: bool = False) -> dict:
+    """Validated servers from mcp-servers.json; "enabled": false entries are
+    validated too but left out unless include_disabled is set."""
     if not os.path.exists(MCP_JSON):
         die(f"missing {MCP_JSON}")
     with open(MCP_JSON, "r", encoding="utf-8") as fh:
@@ -61,7 +71,11 @@ def load_servers() -> dict:
             die(f"{name}: http server needs a 'url'")
         if not isinstance(spec.get("targets", []), list):
             die(f"{name}: 'targets' must be a list")
-    return servers
+        if "enabled" in spec and not isinstance(spec["enabled"], bool):
+            die(f"{name}: 'enabled' must be true or false")
+    if include_disabled:
+        return servers
+    return {name: spec for name, spec in servers.items() if is_enabled(spec)}
 
 
 def targets_of(spec: dict) -> list:
@@ -315,53 +329,83 @@ def cmd_mcp(args) -> int:
     return 1 if any(a == "FAILED" for _t, a, _n in plan) else 0
 
 
+def splice_block(text: str, begin: str, end: str, body: str, after: str = "") -> tuple:
+    """Return (new_text, action): the begin/end block in text replaced with body,
+    or added when absent - right after the line holding `after` when that marker
+    is present, otherwise appended at the end."""
+    block = f"{begin}\n{body}\n{end}\n"
+    if begin in text and end in text:
+        start = text.index(begin)
+        stop = text.index(end) + len(end) + 1
+        return text[:start] + block + text[stop:], "replace block"
+    if after and after in text:
+        at = text.index(after) + len(after)
+        head = text[:at].rstrip("\n") + "\n"
+        tail = text[at:].lstrip("\n")
+        tail = ("\n" + tail) if tail else ""
+        return head + "\n" + block + tail, "insert block (markers absent)"
+    sep = "" if text.endswith("\n\n") or not text else ("\n" if text.endswith("\n") else "\n\n")
+    return text + sep + block, "append block (markers absent)"
+
+
 def cmd_rules(args) -> int:
     if not os.path.exists(RULES_MD):
         print(f"error: {RULES_MD} does not exist yet", file=sys.stderr)
         return 1
     with open(RULES_MD, "r", encoding="utf-8") as fh:
         rules = fh.read().rstrip("\n")
-    block = f"{BEGIN_MARK}\n{rules}\n{END_MARK}\n"
     existing = ""
     if os.path.exists(CODEX_AGENTS):
         with open(CODEX_AGENTS, "r", encoding="utf-8") as fh:
             existing = fh.read()
 
-    if BEGIN_MARK in existing and END_MARK in existing:
-        start = existing.index(BEGIN_MARK)
-        end = existing.index(END_MARK) + len(END_MARK) + 1
-        new = existing[:start] + block + existing[end:]
-        action = "replace block"
-    else:
-        sep = "" if existing.endswith("\n\n") or not existing else ("\n" if existing.endswith("\n") else "\n\n")
-        new = existing + sep + block
-        action = "append block (markers absent)"
+    shared, action = splice_block(existing, BEGIN_MARK, END_MARK, rules)
+    new, local_action, local_lines = shared, "", 0
+    if os.path.exists(LOCAL_MD):
+        with open(LOCAL_MD, "r", encoding="utf-8") as fh:
+            local = fh.read().rstrip("\n")
+        local_lines = len(local.splitlines())
+        new, local_action = splice_block(
+            shared, LOCAL_BEGIN_MARK, LOCAL_END_MARK, local, after=END_MARK
+        )
+    shared_changed = shared != existing
+    local_changed = new != shared
 
-    if new == existing:
+    if not shared_changed and not local_changed:
         print(f"== rules == already in sync ({CODEX_AGENTS})")
         return 0
     if args.dry_run:
-        print(f"== rules PLAN (dry run) == {action} in {CODEX_AGENTS} "
-              f"({len(rules.splitlines())} lines from RULES.md)")
+        if shared_changed:
+            print(f"== rules PLAN (dry run) == {action} in {CODEX_AGENTS} "
+                  f"({len(rules.splitlines())} lines from RULES.md)")
+        if local_changed:
+            print(f"== local rules PLAN (dry run) == {local_action} in {CODEX_AGENTS} "
+                  f"({local_lines} lines from LOCAL.md)")
         return 0
     with open(CODEX_AGENTS, "w", encoding="utf-8") as fh:
         fh.write(new)
-    print(f"== rules == {action} in {CODEX_AGENTS}")
+    if shared_changed:
+        print(f"== rules == {action} in {CODEX_AGENTS}")
+    if local_changed:
+        print(f"== local rules == {local_action} in {CODEX_AGENTS}")
     return 0
 
 
 def cmd_status(_args) -> int:
-    servers = load_servers()
+    servers = load_servers(include_disabled=True)
     codex_present = set(read_codex_tables().keys())
     claude_present = claude_list_names()
     width = max([len(n) for n in servers] + [6])
-    print(f"{'server'.ljust(width)}  claude  codex   targets")
-    print(f"{'-' * width}  ------  ------  -------")
+    print(f"{'server'.ljust(width)}  claude    codex     targets")
+    print(f"{'-' * width}  --------  --------  -------")
     for name in sorted(servers):
         tg = ",".join(targets_of(servers[name]))
-        c = "yes" if name in claude_present else "no"
-        x = "yes" if name in codex_present else "no"
-        print(f"{name.ljust(width)}  {c:<6}  {x:<6}  {tg}")
+        if is_enabled(servers[name]):
+            c = "yes" if name in claude_present else "no"
+            x = "yes" if name in codex_present else "no"
+        else:
+            c = x = "disabled"
+        print(f"{name.ljust(width)}  {c:<8}  {x:<8}  {tg}")
     extra_codex = codex_present - set(servers)
     extra_claude = claude_user_scope_names() - set(servers)
     if extra_codex:
@@ -384,7 +428,7 @@ def main() -> int:
                        help="remove servers not present in mcp-servers.json")
     p_mcp.set_defaults(func=cmd_mcp)
 
-    p_rules = sub.add_parser("rules", help="sync RULES.md into ~/.codex/AGENTS.md")
+    p_rules = sub.add_parser("rules", help="sync RULES.md (and LOCAL.md when present) into ~/.codex/AGENTS.md")
     p_rules.add_argument("--dry-run", action="store_true")
     p_rules.set_defaults(func=cmd_rules)
 

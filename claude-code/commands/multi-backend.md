@@ -1,4 +1,5 @@
 # Backend - Backend-Focused Development
+<!-- installer:requires codex -->
 
 Backend-focused workflow (Research → Ideation → Plan → Execute → Optimize → Review), Codex-led.
 

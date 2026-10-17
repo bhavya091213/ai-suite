@@ -1,4 +1,5 @@
 # Execute - Multi-Model Collaborative Execution
+<!-- installer:requires codex -->
 
 Multi-model collaborative execution - Get prototype from plan → Claude refactors and implements → Multi-model audit and delivery.
 
