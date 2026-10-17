@@ -9,16 +9,21 @@ mod can never do more than the installer already does, and nothing it does delet
 skills move under `~/.agents/backups/`.
 
 ```
-┌ Skills ──────────────────────────────────────────────────────────┐
-│ o:Overview  i:Install  s:Issues  u:Updates  w:Workflows  d:Doctor │
-│ skills 57/90 · 3 updates · 2 issues                               │
-│                                                                    │
-│ repo   ~/code/ai-suite      main · 3 commits behind origin/main    │
-│ shared   installed 57  modified 6   missing 26  problems 0         │
-│ claude   installed 13  modified 1   missing 0   problems 1         │
-│ codex    installed 13  modified 1   missing 0   problems 2         │
-│ [ r: Refresh ]  [ a: Apply config ]                                │
-└────────────────────────────────────────────────────────────────────┘
+AI Suite · Skills                         ~/Documents/ai-suite · main · 3 behind
+ o Overview   i Install   s Installed   u Updates   t Settings   w Workflows   d Doctor
+ 57/90 installed · 3 updates · 2 issues
+
+╭──────────────────────────────────────────────────────────────────╮
+│ Shared                                   57 of 90 installed       │
+│ ████████████████████████████░░░░░░░░░░░░░░░░                      │
+│ 57 installed · 6 modified · 26 missing · 0 problems               │
+╰──────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────╮
+│ Needs attention                                                   │
+│ 3 skills changed upstream                         [Go to Updates] │
+│ 2 broken links                                  [Go to Installed] │
+╰──────────────────────────────────────────────────────────────────╯
+ [Install 26 missing]  [Check for updates]
 ```
 
 ## Before you start
@@ -129,6 +134,7 @@ can change them at any time:
 | --- | --- | --- |
 | **Repo path** (`repoPath`) | empty | Your clone of this repository: the folder that holds `install.sh` and `installer/`. `~` and paths relative to the session folder work. Leave it empty to let the mod find the repo on its own (next section). |
 | **Python** (`python`) | `python3` | The interpreter the mod runs the installer with. Set it when `python3` on your PATH is older than 3.9 or broken (on some Macs `/usr/bin/python3` is only an Xcode stub): for example `/opt/homebrew/bin/python3.12`. |
+| **Open the Skills pane at session start** (`openOnStart`) | on | Opens the pane (without focus) when a session starts. The row above the prompt is shown either way. |
 | **Check on start** (`checkOnStart`) | on | When a session starts, read the skill status and the git state in the background (no network access) and show a summary in the status line, such as `skills 57/90 · 3 updates · 2 issues`. Turn it off if you want the mod to stay silent until you open the pane. |
 
 A changed setting reloads the mod with the new values.
@@ -154,20 +160,32 @@ of that folder.
 
 ## Use it
 
-### Open the pane
+### What appears on its own
 
-Type `/ai-suite` at the prompt. `/skills` opens the same pane; Claude Code ships a command of
-that name, and while this mod is loaded the mod answers it (if the mod's hook ever fails, the
-built-in command runs instead). The pane opens beside the transcript with keyboard focus.
+When a session starts, the mod opens the **Skills** pane beside the transcript (without taking
+your keyboard) and draws one row above the prompt:
+
+```
+Skills · 57/90 installed · 3 updates · 2 issues   [Open]  [Hide]
+```
+
+`Open` (key `k`) brings the pane up with focus; `Hide` removes the row for this session. Turn the
+automatic pane off with the **Open the Skills pane at session start** option if you prefer the
+row alone. In a window too narrow for a side pane the row says so; pressing `Open` still works.
+
+You can also type `/ai-suite` at any time. `/skills` opens the same pane; Claude Code ships a
+command of that name, and while this mod is loaded the mod answers it (if the mod's hook ever
+fails, the built-in command runs instead).
 
 ### Keys
 
 | Key | What it does |
 | --- | --- |
-| `o` `i` `s` `u` `w` `d` | Switch view: Overview, Install, Issues, Updates, Workflows, Doctor |
-| `r` | Refresh the current view (re-reads the installer's status) |
-| `b` / `n` | Previous / next page when a list is longer than the pane |
-| Hotkey shown on a button, e.g. `f` | Press that button |
+| `o` `i` `s` `u` `t` `w` `d` | Switch view: Overview, Install, Installed, Updates, Settings, Workflows, Doctor |
+| `y` / `n` | Answer a confirmation card (Yes / Cancel) |
+| `‹ Prev` / `Next ›` buttons | Page through a long list (5 cards per page) |
+| `k` | Open the pane from the row above the prompt |
+| Hotkey shown on a button | Press that button |
 | `Ctrl+X` then `Tab` | Give the pane keyboard focus (or click it) |
 | `Ctrl+X` then an arrow key | Resize the pane: Left or Up for more room, Right or Down to give it back |
 | `Esc` | Return focus to the prompt (the pane stays open) |
@@ -177,22 +195,26 @@ Hotkeys work while the pane has focus; while you type in the prompt box, keys go
 
 ### Views
 
+Every view is a stack of cards with room between them. A skill card shows the name with a scope
+badge and a state badge (`✓ installed`, `≠ modified`, `· missing`, `? foreign`, `! problem`),
+the description on its own line, and only the buttons that apply to it.
+
 | View | What you see | Buttons |
 | --- | --- | --- |
-| **Overview** (`o`) | Repo path, git line (`main · 3 commits behind origin/main`), and per scope (shared / claude / codex) how many skills are installed, modified, missing and have problems | **Refresh**; **Apply config** (`a`) runs the installer's `apply --yes`: re-renders the rules and agents from `~/.agents/config.json`, installs what your machine has, and syncs hook profile and Codex limits into existing settings files |
-| **Install** (`i`) | Every skill the repo offers that is not installed yet, with scope and description | **Install** per row; **Install all missing** (`a`) |
-| **Issues** (`s`) | Duplicate copies, broken or wrong symlinks, foreign entries, frontmatter problems | **Relink** per row (fixes the symlink into both tools); **Retire** per row (moves the entry under `~/.agents/backups/retired-skills-<stamp>/`) |
-| **Updates** (`u`) | Git banner, commits behind `origin/main`, skills changed upstream; tells you to install git when it is missing | **Fetch** (`f`), **Pull** (`p`, fast-forward only), **Update changed** (`c`: re-installs every modified skill that changed upstream, backing up your copy first) |
-| **Workflows** (`w`) | The workflows you built with the installer's workflow maker: phases, skills, valid or not | **Refresh**. The editor itself is in `./install.sh`, tab `0` |
-| **Doctor** (`d`) | One row per check: Python, curses, git, config, settings sanity, detected tools; `ok`, `warn` or `blocker` | **Refresh** |
-
-Long lists show `N more` and page with `b` / `n`.
+| **Overview** (`o`) | One card per scope (shared / claude / codex) with a progress bar of installed vs offered and the counts; a "Needs attention" card listing updates, issues and missing setup, each with a button that jumps to the right view | **Install N missing**, **Check for updates**, **Set up this machine** (shown until `~/.agents/config.json` exists) |
+| **Install** (`i`) | Filter chips (All / Shared / Claude / Codex), a text filter, then cards of the skills you do not have yet | **Install <name>** per card; **Install all** at the bottom (asks first) |
+| **Installed** (`s`) | Filter chips (All / Modified / Problems / Foreign / Tool-managed); cards with link dots for shared skills (`claude ● codex ●`) | **Update**, **Relink**, **Retire…**, **Files** |
+| **Updates** (`u`) | A git card (branch, upstream, commits behind, last fetch; the install hint when git is missing), the latest commits, and cards for skills changed upstream | **Fetch**, **Pull…**, **Update <name>**, **Update all changed…** |
+| **Settings** (`t`) | Cards per section, every choice a dropdown: tools (auto / on / off), Claude model per tier (opus, sonnet, haiku, the dated ids, or Custom…), Codex model and effort per tier, parallelism, review backend, guardrails (never delete, context budget, pre-flight, approval gates, hook profile), default Obsidian vault (from Obsidian's own registry), editor | Each dropdown saves at once; **Apply to this machine…** re-renders and installs; **Reset a setting…**; **Create it with defaults** when no config exists |
+| **Workflows** (`w`) | Cards for the workflows built with the installer (phases, skills, valid or not) | **Preview SKILL.md**, **Retire…**, **Push to repo…** |
+| **Doctor** (`d`) | The installer's checks (ok / warn / blocker) and the tools it detected with versions | **Refresh** |
 
 ### Nothing risky runs on one press
 
-**Retire**, **Pull**, **Apply config**, **Install all missing** and **Update changed** arm on the
-first press: the button's label changes to `Confirm ...` and the message row says what will
-happen. The second press runs it. Pressing anything else disarms it. Nothing runs on a timer,
+**Retire**, **Pull**, **Apply**, **Install all** and **Update all changed** first show a
+confirmation card at the top of the view: the question, one sentence on what happens (and where
+the backup goes), then `[y] Yes, …` and `[n] Cancel`. Nothing else is pressed while the card is
+up. Nothing runs on a timer,
 one command runs at a time, and a failure (non-zero exit, unexpected output, a folder that is not
 the repo) shows in the message row and as a toast instead of being thrown.
 
@@ -209,6 +231,9 @@ line is empty when everything is in order.
 
 ## Keep it updated, turn it off, remove it
 
+- **Get the newest version** (the pane redesign and Settings tab arrived in 0.3.0): in your
+  shell run `claude plugin update ai-suite@ai-suite`, then `/reload-plugins` in any open
+  session. The Desktop app picks it up on its next local session.
 - **Update**: in a session, `/plugin`, open the **Installed** tab (press Tab), select
   `ai-suite` and choose **Update now**; or in your shell `claude plugin update ai-suite@ai-suite`.
   A third-party marketplace like this one has auto-update **off** by default; turn it on from the
@@ -285,13 +310,16 @@ Layout of `hooks/` (every file under 400 lines):
 
 | File | Job |
 | --- | --- |
-| `register.tsx` | The hooks module: `session.start`, the three `command.run` hooks, the `Pane` render hook |
-| `actions.ts` | What each button does, the two-press rule, the start check and `/skills-check` |
-| `load.ts` | Reading each command into its snapshot, the busy flag |
+| `register.tsx` | The hooks module: `session.start`, the `command.run` hooks, the `Pane` and `AbovePrompt` render hooks |
+| `pane.tsx`, `band.tsx` | The pane shell (header, tabs, status strip) and the row above the prompt |
+| `ui.tsx` | Shared pieces: cards, badges, confirm card, error callout, pager, empty state |
+| `view_*.tsx` | One module per view (overview, install, installed, updates, settings, workflows, doctor) |
+| `presets.ts` | The option lists behind the Settings dropdowns |
+| `actions.ts`, `mutations.ts`, `commands.ts` | What each button does, confirmations, the installer commands they run |
+| `load.ts`, `parse.ts` | Reading each command into its snapshot and parsing the JSON |
 | `state.ts` | Every `$.state` value and its accessors (declared in `types/index.d.ts`) |
-| `cli.ts` | Settings, repo resolution, argv, running a command, parsing JSON |
-| `summary.ts` | Pure helpers: scope counts, status line text, paging |
-| `views.tsx` | The six views as a pure function of the pane's data |
+| `cli.ts` | Settings, repo resolution, argv, running a command |
+| `summary.ts` | Pure helpers: scope counts, status line and band text, paging |
 | `testkit.ts` | Canned installer output and a fake world for the tests |
 
 Rules the hooks-module scan enforces: write every API call in full (`$.ui.open`, never
@@ -309,5 +337,5 @@ with `--yes` and no `--json`: `install NAME --scope S`, `relink NAME`, `retire N
 `update NAME --scope S`, `pull`, `apply`. The full CLI is documented in
 [docs/installer.md](../../docs/installer.md).
 
-Tested with Claude Code 2.1.301 on macOS. The mods API can change between releases; when the
+Tested with Claude Code 2.1.302 on macOS. The mods API can change between releases; when the
 declarations Claude Code writes for your version disagree with this README, trust them.

@@ -157,9 +157,10 @@ Full guide, every key and every command: [docs/installer.md](docs/installer.md).
 
 ## The Claude mod
 
-The same skills manager runs inside Claude Code as a mod: a Skills pane with Overview, Install,
-Issues, Updates, Workflows and Doctor views, a status line entry (`skills 57/90 · 3 updates`),
-and the `/ai-suite` and `/skills-check` commands. Install it with one line in a terminal session:
+The same skills manager runs inside Claude Code as a mod. When a session starts it opens a Skills
+pane (Overview, Install, Installed, Updates, Settings with preset dropdowns, Workflows, Doctor)
+and a one-line row above the prompt (`Skills · 57/90 installed · 3 updates  [Open] [Hide]`).
+Install it with one line in a terminal session:
 
 ```
 /plugin install ai-suite --marketplace bhavya091213/ai-suite

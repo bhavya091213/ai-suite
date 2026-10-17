@@ -1007,3 +1007,108 @@ opens the pane; the Overview tree holds the counts; pressing Install on a row ru
 argv; Retire needs two presses and the first does not run anything; a failing command puts its
 stderr into the message row and runs nothing else; `repoPath` unset resolves the grandparent;
 loop the UI assertions over `['terminal', 'desktop']`.
+
+---
+
+# Part 7 - the pane redesign (mod v0.3)
+
+The mod pane is the user interface. It must read as a calm, spacious app inside Claude, not a
+dense terminal listing. These rules replace the layout notes in Part 6; the behaviour rules of
+Part 6 (one CLI call per action, nothing destructive without confirmation, nothing on a timer,
+errors never thrown) stay.
+
+## Principles
+
+1. **One idea per row, air between rows.** Every section is a `Box` with `borderStyle: 'round'`,
+   `paddingX: 1`, `paddingY: 0`, `flexDirection: 'column'`, and sections are separated by one
+   blank row (`marginBottom: 1`). Never put two unrelated things on one line.
+2. **Cards, not tables.** A skill is a card: line 1 the name in bold plus a scope badge
+   (`[shared]`, coloured dim), a state badge (`✓ installed` green, `≠ modified` amber,
+   `· missing` dim, `? foreign` magenta, `! problem` red); line 2 the description, dim, truncated
+   to the card width; line 3 the action buttons for that card, right-aligned conceptually
+   (drawn as a row after a spacer). Pages of 5 cards with `‹ Prev` / `Next ›` and
+   `Showing 1-5 of 26`.
+3. **Buttons say what they do.** `Install flow-auth`, `Update 3 changed skills`, `Retire…`,
+   never bare verbs. Hotkeys are shown (`plain: true`) only on the tab row and on confirm cards;
+   card buttons are plain bracketed buttons.
+4. **Confirmation is a card, not a label swap.** A pending destructive action draws a
+   highlighted card at the top of the view: question, one sentence of consequence (where the
+   backup goes), `[y] Yes, retire` and `[n] Cancel`. Any other press is ignored while it is up.
+5. **Feedback.** Success and failure as toasts; the latest error also in a red-bordered callout
+   at the top of the view until the next action. A command in flight shows `Working…` in the
+   header strip and disables the card buttons it affects.
+6. **Empty states** are one sentence and one button (`Everything is installed. [Check updates]`).
+7. **Width-aware.** Use `e.props.bodyColumns` (fallback 60); truncate text to width minus the
+   card padding; never let a line wrap inside a card.
+8. **Presets over free text.** Every choice with a small set of valid values is a `Select`.
+   Free text only for paths and custom names, behind a `Custom…` option.
+
+## Header (every view)
+
+```
+AI Suite · Skills                                    ~/Documents/ai-suite · main · 3 behind
+ o Overview   i Install   s Installed   u Updates   t Settings   w Workflows   d Doctor
+ 57/90 installed · 3 updates · 2 issues
+```
+Tabs are `plain: true` buttons with their hotkey; the active tab is bold and underlined. Issues
+are reached from Overview and from the Installed view's filter, not as a separate tab (fewer
+tabs). The third line is the status strip (coloured segments; `Working…` while a command runs).
+
+## Views
+
+- **Overview** (`o`): three scope cards (`Shared`, `Claude`, `Codex`) each with a one-line bar
+  made of `█` and `░` sized to the width showing installed vs total, and the numbers below
+  (`57 installed · 6 modified · 26 missing · 0 problems`); a "Needs attention" card listing up to
+  five items (updates, issues, missing config) each with a button that jumps to the right view;
+  a primary action row: `[Install 26 missing]` `[Check for updates]` `[Set up this machine]`
+  (the last only when config.json is absent; it opens Settings).
+- **Install** (`i`): filter chips (`All · Shared · Claude · Codex`) as plain buttons, an `Input`
+  (`Filter by name…`, `onInput` updates the filter), then the cards of missing skills with
+  `[Install <name>]`; a footer `[Install all 26]` that opens a confirm card.
+- **Installed** (`s`): filter chips `All · Modified · Problems · Foreign · Tool-managed`; cards
+  with state badge, link dots for shared (`claude ●  codex ●`, green ok / red broken / dim
+  missing), and the applicable buttons: `[Update]` (modified), `[Relink]` (link problems),
+  `[Retire…]`, `[Files]` (shows the file list in a card below).
+- **Updates** (`u`): git card (branch, upstream, ahead/behind, last fetch, the hint when git is
+  missing or unconfigured) with `[Fetch]` `[Pull…]`; commits card (up to 5, sha dim); changed
+  skills cards with `[Update <name>]` and `[Update all changed…]`.
+- **Settings** (`t`, new): sections as cards, every control a `Select` writing immediately through
+  `config set KEY VALUE` (toast "Saved", value re-read from `config list --json`):
+  - *Tools*: Claude `auto | on | off`; Codex `auto | on | off`.
+  - *Claude models*: heavy / light / trivial, options `opus`, `sonnet`, `haiku`,
+    `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1`, `Custom…`
+    (reveals an `Input`). Current value shown even when it is not in the list.
+  - *Codex*: model `gpt-5.6-sol | gpt-5.5 | gpt-6-astra | Custom…`; heavy / light / trivial
+    effort `low | medium | high | xhigh | max`; max threads `1 | 2 | 4 | 6 | 8 | 12`; max depth
+    `1 | 2 | 3`.
+  - *Review*: adversarial backend `auto | codex | claude`.
+  - *Guardrails*: never delete `on | off`; context budget `50k | 100k | 150k | 200k`; pre-flight
+    checklist `on | off`; plan approval gate `on | off`; fix approval gate `on | off`; hook
+    profile `minimal | standard | strict`.
+  - *Paths*: default Obsidian vault as a `Select` over the vaults Obsidian's registry knows
+    (`caps --json` → `vaults`) plus `None` and `Custom…`; sessions and backups dirs as text
+    with `[Change…]`.
+  - *Editor*: `nano | vim | vi | code --wait | Custom…`.
+  - Footer: `[Apply to this machine…]` (confirm card, then the `apply --yes` job with its output
+    in a card) and `[Reset a setting…]` (Select of keys → `config reset KEY`). When config.json
+    does not exist yet, a callout at the top says so with `[Create it with defaults]` (writes
+    the first `config set`).
+- **Workflows** (`w`): cards (name, N phases, N skills, valid/invalid with the first message),
+  `[Preview SKILL.md]` (text in a card below, paged), `[Retire…]`, `[Push to repo…]`, and a
+  dim line: `Create or edit workflows with ./install.sh (tab 0)`.
+- **Doctor** (`d`): checks as rows with a coloured glyph and the text; tools as a two-column
+  list (name, version or "not found").
+
+## Data the Settings view needs
+
+`config list --json` (keys, kinds, labels, choices, current values), `caps --json` (`vaults`
+when present), `config set KEY VALUE`, `config reset KEY`. All exist in the CLI today.
+
+## Tests
+
+Tree-level tests through `claude plugin test` on `terminal` and `desktop`: each view renders its
+header and at least one card; the Settings view renders a `Select` per setting with the listed
+options and the current value selected; choosing an option runs `config set` with the right
+argv; `Custom…` reveals an Input whose submit runs `config set`; the confirm card appears for
+Retire / Pull / Install all / Apply, `y` runs and `n` cancels; paging buttons move the page; the
+missing-config callout appears when `config list --json` reports `exists: false`.

@@ -1,19 +1,17 @@
-// What the pane does: the two-press confirm, switching views, and the mutating
-// commands behind the buttons, plus the session-level checks. Every failure
-// lands in the message atom and a toast; nothing here throws or runs on a timer.
+// What the pane does when a control is used: the confirm card's rule, switching views,
+// filters and pages, and the hand-off to mutations.ts, plus the session-level checks.
+// Every failure lands in the message atom and a toast; nothing here throws or runs on a timer.
 import type { EngineInterface } from 'claude-code'
-import type { AiSuiteChanged, AiSuiteView } from '../types'
-import { errText, notableLines, runCli, truncate } from './cli'
+import type { AiSuiteInstalledFilter, AiSuiteView } from '../types'
+import { errText } from './cli'
 import type { Settings } from './cli'
+import { decodeConfirm, encodeConfirm, idOf } from './commands'
+import type { Act, Command } from './commands'
 import {
-  APPLY_MS,
   DOCTOR,
-  SLOW_MS,
   STATUS,
   UPDATES,
   UPDATES_FETCH,
-  fail,
-  invalidateAll,
   isStale,
   load,
   refreshStatusLine,
@@ -22,55 +20,39 @@ import {
   withBusy,
 } from './load'
 import {
+  applyConfig,
+  createConfig,
+  fetchUpdates,
+  installAll,
+  installOne,
+  pullRepo,
+  relinkOne,
+  resetSetting,
+  retireOne,
+  saveSetting,
+  showDetail,
+  updateChanged,
+  updateOne,
+  workflowAct,
+} from './mutations'
+import {
   PANE_ID,
   clearMessage,
+  getPending,
   getRepo,
   getSnapshots,
   getView,
-  setMessage,
+  patchFilters,
+  resetPages,
+  setCustomKey,
+  setDetail,
   setPage,
+  setPaneWaiting,
   setPending,
   setView,
   takePending,
 } from './state'
 import { checkSummary } from './summary'
-
-export type Named = { scope: string; name: string }
-
-/** What a button does, as data: the pane's tree holds no `$`, so the hook runs it. */
-export type Command =
-  | { kind: 'view'; view: AiSuiteView }
-  | { kind: 'refresh'; view: AiSuiteView }
-  | { kind: 'page'; page: number }
-  | { kind: 'install'; row: Named }
-  | { kind: 'install-all' }
-  | { kind: 'relink'; row: Named }
-  | { kind: 'retire'; row: Named }
-  | { kind: 'apply' }
-  | { kind: 'fetch' }
-  | { kind: 'pull' }
-  | { kind: 'update-changed' }
-
-export type Act = {
-  key: string
-  label: string
-  command: Command
-  hotkey?: string
-  /** When set the button arms on its first press (showing this text) and runs on its second. */
-  confirm?: string
-  isPrimary?: boolean
-}
-
-type Step = { args: string[]; timeoutMs: number }
-
-const step = (args: string[], timeoutMs = SLOW_MS): Step => ({ args, timeoutMs })
-
-const idOf = (row: Named): string => `${row.scope}/${row.name}`
-
-function byScope(items: readonly Named[]): [string, string[]][] {
-  const scopes = [...new Set(items.map(item => item.scope))]
-  return scopes.map(scope => [scope, items.filter(item => item.scope === scope).map(item => item.name)])
-}
 
 // ----------------------------------------------------------- views and paging
 
@@ -89,138 +71,141 @@ async function loadFor(
   await refreshStatusLine($)
 }
 
-async function openView($: EngineInterface, settings: Settings, view: AiSuiteView): Promise<void> {
+async function openView(
+  $: EngineInterface,
+  settings: Settings,
+  view: AiSuiteView,
+  installed: AiSuiteInstalledFilter | undefined,
+): Promise<void> {
   await setView($, view)
-  await setPage($, 0)
+  await resetPages($)
+  await setDetail($, null)
+  await setCustomKey($, null)
   await clearMessage($)
+  if (installed !== undefined) await patchFilters($, { installed })
   await loadFor($, settings, `Loading ${view}`, view, false)
 }
 
 /** `/skills`: open the pane, then fill whatever the current view is missing. */
 export async function openPane($: EngineInterface, settings: Settings): Promise<string> {
   const opened = await $.ui.open({ id: PANE_ID, title: 'Skills', focus: true, closeOnEscape: true })
+  await setPaneWaiting($, !opened.isPlaced)
+  await setPending($, null)
   await loadFor($, settings, 'Loading', await getView($), false)
   return opened.isPlaced ? 'Skills pane opened.' : `Skills pane is waiting: ${opened.reason}`
 }
 
-// ----------------------------------------------------------------- mutations
-
-/** Runs the steps in order, stops at the first failure, and on success re-reads what the pane shows. */
-async function mutate(
-  $: EngineInterface,
-  settings: Settings,
-  view: AiSuiteView,
-  label: string,
-  steps: readonly Step[],
-  done: string,
-): Promise<void> {
-  await withBusy($, label, async () => {
-    const cfg = await resolveCfg($, settings, false)
-    if (cfg === null) return
-    const notes: string[] = []
-    let didSomething = false
-    for (const next of steps) {
-      const out = await runCli($, cfg, next.args, { timeoutMs: next.timeoutMs })
-      if (!out.ok) {
-        await fail($, `${label} failed: ${out.error}`)
-        return
-      }
-      didSomething = didSomething || !/^Nothing to do\.$/m.test(out.stdout)
-      notes.push(...notableLines(out.stdout, cfg.home))
+/**
+ * session.start's own open: no `focus`, so it never takes the keyboard. On a terminal too narrow
+ * for an unasked pane it waits undrawn; that is remembered so the band says how to seat it.
+ * Never throws.
+ */
+export async function autoOpenPane($: EngineInterface): Promise<void> {
+  try {
+    const opened = await $.ui.open({ id: PANE_ID, title: 'Skills' })
+    await setPaneWaiting($, !opened.isPlaced)
+  } catch (error) {
+    try {
+      $.ui.log(`ai-suite: the pane did not open at start: ${errText(error)}`, { to: 'debug' })
+    } catch {
+      // nothing more can be done
     }
-    await invalidateAll($)
-    await setMessage(
-      $,
-      didSomething ? 'ok' : 'info',
-      truncate([didSomething ? done : 'Nothing to do.', ...notes].join(' · '), 400),
-    )
-    if (await refreshView($, cfg, view, false)) await refreshView($, cfg, 'overview', false)
-  })
-  await refreshStatusLine($)
-}
-
-async function installAllMissing($: EngineInterface, settings: Settings): Promise<void> {
-  const { catalog } = await getSnapshots($)
-  const missing = (catalog.data ?? []).filter(row => row.state === 'not-installed')
-  if (missing.length === 0) {
-    await setMessage($, 'info', 'Nothing to install.')
-    return
   }
-  const steps = byScope(missing).map(([scope, names]) => step(['install', ...names, '--scope', scope, '--yes']))
-  await mutate($, settings, 'install', 'Install all missing', steps, `Installed ${missing.length} skills.`)
 }
 
-async function updateChanged($: EngineInterface, settings: Settings): Promise<void> {
-  const { status, updates } = await getSnapshots($)
-  const modified = new Set((status.data ?? []).filter(row => row.state === 'modified').map(idOf))
-  const targets: AiSuiteChanged[] = (updates.data?.changed ?? []).filter(change => modified.has(idOf(change)))
-  if (targets.length === 0) {
-    await setMessage($, 'info', 'No modified skill has an upstream change.')
-    return
-  }
-  const steps = byScope(targets).map(([scope, names]) => step(['update', ...names, '--scope', scope, '--yes']))
-  await mutate($, settings, 'updates', 'Update changed', steps, `Updated ${targets.length} skills.`)
-}
-
-async function fetchUpdates($: EngineInterface, settings: Settings): Promise<void> {
-  await withBusy($, 'Fetching', async () => {
-    const cfg = await resolveCfg($, settings, false)
-    if (cfg === null) return
-    if ((await load($, cfg, UPDATES_FETCH, false)) === null) await setMessage($, 'ok', 'Fetched.')
-  })
-  await refreshStatusLine($)
-}
+// ------------------------------------------------------------------- pressing
 
 async function perform($: EngineInterface, settings: Settings, command: Command): Promise<void> {
   switch (command.kind) {
     case 'view':
-      return openView($, settings, command.view)
+      return openView($, settings, command.view, command.installed)
     case 'refresh':
-      return loadFor($, settings, 'Refreshing', command.view, true)
+      return loadFor($, settings, 'Refreshing', await getView($), true)
     case 'page':
-      await setPage($, command.page)
-      return
+      return setPage($, command.list, command.page)
+    case 'scope':
+      await patchFilters($, { installScope: command.value })
+      return setPage($, 'install', 0)
+    case 'state':
+      await patchFilters($, { installed: command.value })
+      return setPage($, 'installed', 0)
+    case 'query':
+      await patchFilters($, { installQuery: command.text })
+      return setPage($, 'install', 0)
     case 'install':
-      return mutate($, settings, 'install', `Install ${idOf(command.row)}`,
-        [step(['install', command.row.name, '--scope', command.row.scope, '--yes'])],
-        `Installed ${idOf(command.row)}.`)
+      return installOne($, settings, command.row)
     case 'install-all':
-      return installAllMissing($, settings)
+      return installAll($, settings, command.scope, command.query)
+    case 'update':
+      return updateOne($, settings, command.row)
+    case 'update-changed':
+      return updateChanged($, settings)
     case 'relink':
-      return mutate($, settings, 'issues', `Relink ${idOf(command.row)}`,
-        [step(['relink', command.row.name, '--yes'])], `Relinked ${idOf(command.row)}.`)
+      return relinkOne($, settings, command.row)
     case 'retire':
-      return mutate($, settings, 'issues', `Retire ${idOf(command.row)}`,
-        [step(['retire', command.row.name, '--scope', command.row.scope, '--yes'])],
-        `Retired ${idOf(command.row)} (moved to a backup).`)
-    case 'apply':
-      return mutate($, settings, 'overview', 'Apply config',
-        [step(['apply', '--yes'], APPLY_MS)], 'Config applied.')
+      return retireOne($, settings, command.row)
+    case 'files':
+      return showDetail($, settings, 'files', idOf(command.row), ['tree', command.row.name, '--scope', command.row.scope])
+    case 'close-detail':
+      return setDetail($, null)
     case 'fetch':
       return fetchUpdates($, settings)
     case 'pull':
-      return mutate($, settings, 'updates', 'Pull', [step(['pull', '--yes'])], 'Pulled (fast-forward only).')
-    case 'update-changed':
-      return updateChanged($, settings)
+      return pullRepo($, settings)
+    case 'apply':
+      return applyConfig($, settings)
+    case 'set':
+      return saveSetting($, settings, command.key, command.value)
+    case 'custom':
+      return setCustomKey($, command.key)
+    case 'reset':
+      return resetSetting($, settings, command.key)
+    case 'create-config':
+      return createConfig($, settings)
+    case 'preview':
+      return showDetail($, settings, 'preview', command.name, ['workflow', 'render', command.name])
+    case 'workflow-retire':
+      return workflowAct($, settings, 'retire', command.name)
+    case 'workflow-push':
+      return workflowAct($, settings, 'push', command.name)
+    case 'yes':
+    case 'no':
+      return
+  }
+}
+
+/** Arms a confirm card and brings the top of the pane (where the card is drawn) into view. */
+async function askConfirm($: EngineInterface, command: Command): Promise<void> {
+  await setPending($, encodeConfirm(command))
+  try {
+    await $.ui.scroll({ to: 'start', in: PANE_ID })
+  } catch {
+    // the card is still drawn; only the scroll was refused
   }
 }
 
 /**
- * One button press. A button with a `confirm` text arms on its first press and
- * runs on its second; any other press (including another button's first) disarms it.
+ * One press. While a confirm card is up only its Yes and No act and every other press is
+ * ignored; Yes runs the command the card was armed with. An act marked `confirm` arms the card
+ * instead of running; anything else clears the last message and runs.
  */
 export async function pressAct($: EngineInterface, settings: Settings, act: Act): Promise<void> {
-  if (act.confirm === undefined) {
-    await setPending($, null)
-    await perform($, settings, act.command)
+  const kind = act.command.kind
+  if ((await getPending($)) !== null) {
+    if (kind === 'no') await setPending($, null)
+    if (kind !== 'yes') return
+    const taken = await takePending($)
+    const command = taken === null ? null : decodeConfirm(taken)
+    if (command !== null) await perform($, settings, command)
     return
   }
-  if (await takePending($, act.key)) {
-    await perform($, settings, act.command)
+  if (kind === 'yes' || kind === 'no') return
+  if (act.confirm === true) {
+    await askConfirm($, act.command)
     return
   }
-  await setPending($, act.key)
-  await setMessage($, 'info', `${act.confirm} Press again to confirm.`)
+  await clearMessage($)
+  await perform($, settings, act.command)
 }
 
 // -------------------------------------------------------- session-level work

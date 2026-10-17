@@ -1,6 +1,6 @@
 // Run with: claude plugin test mods/ai-suite
-// The Part 6 tests: session.start, repo resolution, the commands and the pane's core
-// flows. `process.run` is answered per argv with canned installer JSON (testkit.ts).
+// The Part 6 tests: session.start, repo resolution and the commands. The pane's views are tested
+// in views.test.ts and settings.test.ts. `process.run` is answered per argv with canned JSON (testkit.ts).
 import { expect, test } from 'claude-code/testing'
 import { grandparent, resolveRepo } from './cli'
 import {
@@ -10,7 +10,6 @@ import {
   SURFACES,
   bad,
   flush,
-  labelOf,
   mountPane,
   run,
   textCount,
@@ -221,7 +220,7 @@ test('/skills opens the pane and loads the overview; /ai-suite does the same', A
   expect(second.text).toBe('Skills pane opened.')
   expect(w.opened).toEqual(['ai-suite', 'ai-suite'])
   // the second open found everything loaded already
-  expect(w.commands()).toEqual(['status --json', 'updates --json'])
+  expect(w.commands()).toEqual(['status --json', 'updates --json', 'config path'])
 })
 
 test('/skills-check runs doctor then a fetching updates read and toasts one line', AT_REPO, async ($, on) => {
@@ -247,83 +246,3 @@ test('/skills-check accepts doctor exit 1 with JSON, and reports a failing read'
   expect(result.text).toBe('skills check: doctor: 1 blocker · updates failed (error: fetch failed)')
   expect(w.toasts).toEqual([result.text])
 })
-
-// ---------------------------------------------------------------- the pane UI
-
-for (const surface of SURFACES) {
-  test(`${surface}: the Overview holds the counts, the repo and the git line`, AT_REPO, async ($, on) => {
-    const w = world(on)
-    await $.command.run(run('skills'))
-    const ui = await mountPane($, surface)
-
-    expect(await textCount(ui, /^shared: 1 installed, 1 modified, 1 missing, 1 problem$/)).toBe(1)
-    expect(await textCount(ui, /^claude: 1 installed, 0 modified, 0 missing, 1 problem$/)).toBe(1)
-    expect(await textCount(ui, /^Repo: \/work\/ai-suite$/)).toBe(1)
-    expect(await textCount(ui, /^git: 3 commits behind origin\/main$/)).toBe(1)
-    expect(await labelOf(ui, 'view-overview')).toBe('Overview')
-    expect(w.commands()).toEqual(['status --json', 'updates --json'])
-    await ui.unmount()
-  })
-
-  test(`${surface}: pressing Install on a row runs the expected argv`, AT_REPO, async ($, on) => {
-    const w = world(on)
-    await $.command.run(run('skills'))
-    const ui = await mountPane($, surface)
-
-    await ui.press({ key: 'view-install' })
-    expect(await labelOf(ui, 'install:shared/dup')).toBe('Install')
-    expect(await labelOf(ui, 'install:claude/nometa')).toBe('Install')
-    expect(await labelOf(ui, 'install:shared/alpha')).toBeUndefined()
-
-    const before = w.calls.length
-    await ui.press({ key: 'install:shared/dup' })
-    const ran = w.calls.slice(before)
-    expect(ran[0]?.argv).toEqual([...PY, 'install', 'dup', '--scope', 'shared', '--yes'])
-    expect(ran[0]?.cwd).toBe(REPO)
-    expect(await textCount(ui, /^Installed shared\/dup\.$/)).toBe(1)
-    await ui.unmount()
-  })
-
-  test(`${surface}: Retire needs two presses and the first runs nothing`, AT_REPO, async ($, on) => {
-    const w = world(on)
-    await $.command.run(run('skills'))
-    const ui = await mountPane($, surface)
-    await ui.press({ key: 'view-issues' })
-    const retires = () => w.commands().filter(command => command.startsWith('retire'))
-
-    expect(await labelOf(ui, 'retire:claude/ghost')).toBe('Retire')
-    expect(await labelOf(ui, 'relink:shared/beta')).toBe('Relink')
-    expect(await labelOf(ui, 'retire:shared/beta')).toBe('Retire')
-
-    await ui.press({ key: 'retire:claude/ghost' })
-    expect(retires()).toHaveLength(0)
-    expect(await labelOf(ui, 'retire:claude/ghost')).toBe('Confirm retire')
-    expect(await textCount(ui, /Press again to confirm/)).toBe(1)
-
-    // any other press disarms it
-    await ui.press({ key: 'refresh' })
-    expect(await labelOf(ui, 'retire:claude/ghost')).toBe('Retire')
-    await ui.press({ key: 'retire:claude/ghost' })
-    expect(retires()).toHaveLength(0)
-
-    await ui.press({ key: 'retire:claude/ghost' })
-    expect(retires()).toEqual(['retire ghost --scope claude --yes'])
-    expect(await textCount(ui, /^Retired claude\/ghost \(moved to a backup\)\.$/)).toBe(1)
-    await ui.unmount()
-  })
-
-  test(`${surface}: a failing command shows its stderr, toasts, and runs nothing else`, AT_REPO, async ($, on) => {
-    const w = world(on, { canned: { 'install dup --scope shared --yes': bad('error: unknown skill: dup') } })
-    await $.command.run(run('skills'))
-    const ui = await mountPane($, surface)
-    await ui.press({ key: 'view-install' })
-
-    const before = w.calls.length
-    await ui.press({ key: 'install:shared/dup' })
-    expect(w.commands().slice(before)).toEqual(['install dup --scope shared --yes'])
-    expect(await textCount(ui, /install shared\/dup failed: error: unknown skill: dup/i)).toBe(1)
-    expect(w.toasts.some(line => line.includes('error: unknown skill: dup'))).toBe(true)
-    expect(await labelOf(ui, 'install:shared/dup')).toBe('Install')
-    await ui.unmount()
-  })
-}

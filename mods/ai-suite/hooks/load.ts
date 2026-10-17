@@ -2,19 +2,16 @@
 // snapshot, the busy flag, repo resolution, failures and the status line.
 import type { EngineInterface } from 'claude-code'
 import type { AiSuiteView } from '../types'
+import { errText, resolveRepo, runCli, runJson, truncate } from './cli'
+import type { Cfg, RunOptions, Settings } from './cli'
 import {
-  errText,
-  parseCatalog,
+  parseCaps,
+  parseConfig,
   parseDoctor,
-  parseIssues,
   parseStatus,
   parseUpdates,
   parseWorkflows,
-  resolveRepo,
-  runJson,
-  truncate,
-} from './cli'
-import type { Cfg, RunOptions, Settings } from './cli'
+} from './parse'
 import {
   getBusy,
   getSnapshots,
@@ -73,18 +70,6 @@ export const STATUS: LoadSpec = {
   args: ['status', '--json'],
   parse: parseStatus,
 }
-const CATALOG: LoadSpec = {
-  name: 'catalog',
-  label: 'list',
-  args: ['list', '--json'],
-  parse: parseCatalog,
-}
-const ISSUES: LoadSpec = {
-  name: 'issues',
-  label: 'issues',
-  args: ['issues', '--json'],
-  parse: parseIssues,
-}
 export const UPDATES: LoadSpec = {
   name: 'updates',
   label: 'updates',
@@ -97,12 +82,6 @@ export const UPDATES_FETCH: LoadSpec = {
   args: ['updates', '--json', '--fetch'],
   options: { accept: [0, 1], timeoutMs: FETCH_MS },
 }
-const WORKFLOWS: LoadSpec = {
-  name: 'workflows',
-  label: 'workflow list',
-  args: ['workflow', 'list', '--json'],
-  parse: parseWorkflows,
-}
 export const DOCTOR: LoadSpec = {
   name: 'doctor',
   label: 'doctor',
@@ -110,19 +89,82 @@ export const DOCTOR: LoadSpec = {
   parse: parseDoctor,
   options: { accept: [0, 1] },
 }
+export const CONFIG: LoadSpec = {
+  name: 'config',
+  label: 'config list',
+  args: ['config', 'list', '--json'],
+  parse: parseConfig,
+}
+const WORKFLOWS: LoadSpec = {
+  name: 'workflows',
+  label: 'workflow list',
+  args: ['workflow', 'list', '--json'],
+  parse: parseWorkflows,
+}
+const CAPS: LoadSpec = {
+  name: 'caps',
+  label: 'caps',
+  args: ['caps', '--json'],
+  parse: parseCaps,
+}
 
-const SOURCES: Record<AiSuiteView, readonly LoadSpec[]> = {
-  overview: [STATUS, UPDATES],
-  install: [CATALOG],
-  issues: [ISSUES],
-  updates: [UPDATES, STATUS],
-  workflows: [WORKFLOWS],
-  doctor: [DOCTOR],
+/** Reads `config path`, then asks the file system whether config.json is there yet. */
+export async function loadConfigFile($: EngineInterface, cfg: Cfg, isQuiet: boolean): Promise<string | null> {
+  const out = await runCli($, cfg, ['config', 'path'])
+  const path = out.ok ? (out.stdout.split('\n')[0] ?? '').trim() : ''
+  let exists = false
+  if (path !== '') {
+    try {
+      exists = await $.fs.exists(path)
+    } catch {
+      exists = false
+    }
+  }
+  const error = out.ok ? (path === '' ? 'config path: no path printed' : null) : out.error
+  const now = await $.clock.now()
+  await patchSnapshot($, 'configFile', previous =>
+    error === null
+      ? { data: { path, exists }, fetchedAt: now, error: null }
+      : { ...previous, error },
+  )
+  if (error !== null && !isQuiet) await fail($, `config path failed: ${error}`)
+  return error
+}
+
+/** Loads one snapshot by name; returns the error text, or null on success. */
+async function loadSnapshot(
+  $: EngineInterface,
+  cfg: Cfg,
+  name: SnapshotName,
+  isQuiet: boolean,
+): Promise<string | null> {
+  const specs: Record<Exclude<SnapshotName, 'configFile'>, LoadSpec> = {
+    status: STATUS,
+    updates: UPDATES,
+    workflows: WORKFLOWS,
+    doctor: DOCTOR,
+    caps: CAPS,
+    config: CONFIG,
+  }
+  return name === 'configFile'
+    ? loadConfigFile($, cfg, isQuiet)
+    : load($, cfg, specs[name], isQuiet)
+}
+
+/** What each view reads, in order: a view is stale while any of these has neither data nor an error. */
+const SOURCES: Record<AiSuiteView, readonly SnapshotName[]> = {
+  overview: ['status', 'updates', 'configFile'],
+  install: ['status'],
+  installed: ['status'],
+  updates: ['updates', 'status'],
+  settings: ['configFile', 'config', 'caps'],
+  workflows: ['workflows'],
+  doctor: ['doctor', 'caps'],
 }
 
 export async function isStale($: EngineInterface, view: AiSuiteView): Promise<boolean> {
   const all = await getSnapshots($)
-  return SOURCES[view].some(spec => all[spec.name].data === null && all[spec.name].error === null)
+  return SOURCES[view].some(name => all[name].data === null && all[name].error === null)
 }
 
 /** Loads what a view shows; stops at the first failure. `isForced` re-reads what is already there. */
@@ -132,10 +174,10 @@ export async function refreshView(
   view: AiSuiteView,
   isForced: boolean,
 ): Promise<boolean> {
-  for (const spec of SOURCES[view]) {
-    const known = (await getSnapshots($))[spec.name]
+  for (const name of SOURCES[view]) {
+    const known = (await getSnapshots($))[name]
     if (!isForced && (known.data !== null || known.error !== null)) continue
-    if ((await load($, cfg, spec, false)) !== null) return false
+    if ((await loadSnapshot($, cfg, name, false)) !== null) return false
   }
   return true
 }
@@ -156,8 +198,8 @@ export async function resolveCfg(
   await setRepo(
     $,
     found.ok
-      ? { path: found.repo, shown: found.shown, error: '' }
-      : { path: '', shown: '', error: found.error },
+      ? { path: found.repo, shown: found.shown, home: found.home, error: '' }
+      : { path: '', shown: '', home: '', error: found.error },
   )
   if (found.ok) return { repo: found.repo, python: settings.python, home: found.home }
   if (!isQuiet) await fail($, found.error)

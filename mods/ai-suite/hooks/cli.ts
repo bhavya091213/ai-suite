@@ -1,19 +1,14 @@
 // Everything between the mod and the installer CLI: user settings, repo
-// resolution, argv building, running a command without a shell, and turning
-// its JSON into the small shapes the pane keeps. Nothing here throws.
+// resolution, argv building and running a command without a shell. The JSON it
+// prints is turned into the small shapes the pane keeps by parse.ts. Nothing here throws.
 import type { EngineInterface, PluginOptions } from 'claude-code'
-import type {
-  AiSuiteCatalogRow,
-  AiSuiteCheckState,
-  AiSuiteDoctor,
-  AiSuiteIssues,
-  AiSuiteProblem,
-  AiSuiteSkillRow,
-  AiSuiteUpdates,
-  AiSuiteWorkflow,
-} from '../types'
 
-export type Settings = { repoPath: string; python: string; checkOnStart: boolean }
+export type Settings = {
+  repoPath: string
+  python: string
+  checkOnStart: boolean
+  openOnStart: boolean
+}
 export type Cfg = { repo: string; python: string; home: string }
 
 export function readSettings(options: PluginOptions): Settings {
@@ -23,6 +18,7 @@ export function readSettings(options: PluginOptions): Settings {
     repoPath,
     python: python === '' ? 'python3' : python,
     checkOnStart: options.checkOnStart !== false,
+    openOnStart: options.openOnStart !== false,
   }
 }
 
@@ -217,149 +213,4 @@ export function notableLines(stdout: string, home: string): string[] {
     .map(line => (home === '' ? line : line.split(home).join('~')))
     .map(line => truncate(line, 160))
     .slice(0, 3)
-}
-
-// -------------------------------------------------------------------- parsing
-
-function rec(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-const str = (value: unknown): string => (typeof value === 'string' ? value : '')
-const num = (value: unknown): number =>
-  typeof value === 'number' && Number.isFinite(value) ? value : 0
-const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
-const texts = (value: unknown): string[] => arr(value).map(str).filter(text => text !== '')
-
-function badLinks(row: Record<string, unknown>): { consumer: string; state: string }[] {
-  return arr(row.links)
-    .map(rec)
-    .filter((link): link is Record<string, unknown> => link !== null)
-    .map(link => ({ consumer: str(link.consumer), state: str(link.state) }))
-    .filter(link => link.state !== 'ok' && link.state !== 'missing')
-}
-
-export function parseStatus(raw: unknown): AiSuiteSkillRow[] | null {
-  if (!Array.isArray(raw)) return null
-  const rows: AiSuiteSkillRow[] = []
-  for (const item of raw) {
-    const row = rec(item)
-    if (row === null || str(row.scope) === '' || str(row.name) === '') continue
-    rows.push({
-      scope: str(row.scope),
-      name: str(row.name),
-      state: str(row.state),
-      hasSource: rec(row.source) !== null,
-      hasProblem:
-        texts(row.issues).length > 0 || arr(row.duplicates).length > 0 || badLinks(row).length > 0,
-      hasRemote: row.remote !== null && row.remote !== undefined,
-    })
-  }
-  return rows
-}
-
-export function parseCatalog(raw: unknown): AiSuiteCatalogRow[] | null {
-  if (!Array.isArray(raw)) return null
-  const rows: AiSuiteCatalogRow[] = []
-  for (const item of raw) {
-    const row = rec(item)
-    if (row === null || str(row.scope) === '' || str(row.name) === '') continue
-    rows.push({
-      scope: str(row.scope),
-      name: str(row.name),
-      state: str(row.state),
-      installed: str(row.installed),
-      description: str(row.description),
-    })
-  }
-  return rows
-}
-
-function toProblem(row: Record<string, unknown>): AiSuiteProblem {
-  const notes = [...texts(row.issues), ...texts(row.duplicates)]
-  const links = arr(row.links).map(rec).filter((link): link is Record<string, unknown> => link !== null)
-  const state = str(row.state)
-  const more = notes.length > 1 ? ` (+${notes.length - 1} more)` : ''
-  return {
-    scope: str(row.scope),
-    name: str(row.name),
-    state,
-    text: `${notes[0] ?? 'link problem'}${more}`,
-    canRelink: str(row.scope) === 'shared' && links.some(link => str(link.state) !== 'ok'),
-    canRetire: rec(row.installed) !== null && ['installed', 'modified', 'foreign'].includes(state),
-  }
-}
-
-export function parseIssues(raw: unknown): AiSuiteIssues | null {
-  const root = rec(raw)
-  if (root === null) return null
-  return {
-    problems: arr(root.problems)
-      .map(rec)
-      .filter((row): row is Record<string, unknown> => row !== null)
-      .map(toProblem),
-    repoIssues: arr(root.repo_issues)
-      .map(rec)
-      .filter((row): row is Record<string, unknown> => row !== null)
-      .map(row => ({ scope: str(row.scope), name: str(row.name), message: str(row.message) })),
-  }
-}
-
-function formatTime(value: unknown): string {
-  if (typeof value === 'string') return value
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return ''
-  const ms = value < 1e12 ? value * 1000 : value
-  return `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')}Z`
-}
-
-export function parseUpdates(raw: unknown): AiSuiteUpdates | null {
-  const root = rec(raw)
-  if (root === null) return null
-  const git = rec(root.git) ?? {}
-  return {
-    git: {
-      message: str(git.message),
-      hint: str(git.hint),
-      branch: str(git.branch),
-      upstream: str(git.upstream),
-      ahead: num(git.ahead),
-      behind: num(git.behind),
-      lastFetch: formatTime(git.last_fetch),
-    },
-    commits: texts(root.commits),
-    changed: arr(root.changed)
-      .map(rec)
-      .filter((row): row is Record<string, unknown> => row !== null && str(row.name) !== '')
-      .map(row => ({ scope: str(row.scope), name: str(row.name), files: arr(row.files).length })),
-  }
-}
-
-export function parseWorkflows(raw: unknown): AiSuiteWorkflow[] | null {
-  if (!Array.isArray(raw)) return null
-  return raw
-    .map(rec)
-    .filter((row): row is Record<string, unknown> => row !== null && str(row.name) !== '')
-    .map(row => ({
-      name: str(row.name),
-      phases: num(row.phases),
-      skills: num(row.skills),
-      valid: row.valid !== false,
-      note: texts(row.errors)[0] ?? texts(row.warnings)[0] ?? '',
-    }))
-}
-
-function checkState(value: unknown): AiSuiteCheckState {
-  return value === 'ok' || value === 'blocker' ? value : 'warn'
-}
-
-export function parseDoctor(raw: unknown): AiSuiteDoctor | null {
-  const root = rec(raw)
-  if (root === null || !Array.isArray(root.checks)) return null
-  const checks = root.checks
-    .map(rec)
-    .filter((row): row is Record<string, unknown> => row !== null)
-    .map(row => ({ name: str(row.name), state: checkState(row.state), text: str(row.text) }))
-  const counted = checks.filter(check => check.state === 'blocker').length
-  return { checks, blockers: typeof root.blockers === 'number' ? root.blockers : counted }
 }
