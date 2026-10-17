@@ -12,10 +12,20 @@ faithful, portable and free of machine-specific state.
 | `shared/skills/` | symlinked into `~/.claude/skills` **and** `~/.codex/skills` | One copy, two consumers |
 | `claude-code/` | `~/.claude/` | Claude Code only |
 | `codex/` | `~/.codex/` | Codex CLI only |
-| `docs/` | nothing | Long-form guides for readers of the repo |
+| `installer/` | nothing | The tool that installs the rest: curses TUI plus the `python3 -m installer` CLI, Python 3.9+ standard library only. Contract: `installer/ARCHITECTURE.md`. Tests: `python3 -m unittest discover -s installer/tests -t .` |
+| `docs/` | nothing | Long-form guides for readers of the repo (`docs/installer.md` is the installer guide) |
+| `mods/ai-suite/` | nothing (users run `/plugin install ai-suite --marketplace bhavya091213/ai-suite`) | Claude Code mod: the skills manager as a pane inside Claude; `.claude-plugin/marketplace.json` at the repo root lists it |
 
-`install.sh` performs that mapping. If you add a new top-level directory or a new category of
-file, update `install.sh` in the same change or it will silently not be installed.
+`install.sh` performs that mapping, and is also the front door to `installer/`: a bare run on a
+terminal opens the TUI, `--auto` installs the sections the installer picks for this machine, and
+`skills <args>` forwards to `python3 -m installer <args>`. If you add a new top-level directory or
+a new category of file, update `install.sh` in the same change or it will silently not be
+installed.
+
+Three files under `shared/` are special. `config.example.json` and `LOCAL.example.md` install to
+`~/.agents/config.json` and `~/.agents/LOCAL.md` **only when those are absent** (like
+`settings.json` and `config.toml`; they are the user's afterwards). `extras.json` is read by the
+installer straight from the repo and installed nowhere.
 
 ## Skill placement rules
 
@@ -34,20 +44,106 @@ file, update `install.sh` in the same change or it will silently not be installe
 
 ## Rules must stay in sync
 
-`shared/RULES.md` is authoritative.
+`shared/RULES.md` is authoritative, and it is a **template** (see the next section): the repo holds
+template text, the installed `~/.agents/RULES.md` holds the rendered result.
 
-- Claude Code imports it: `claude-code/CLAUDE.md` contains `@~/.agents/RULES.md` and nothing is
-  duplicated.
-- Codex cannot import, so `codex/AGENTS.md` carries a verbatim copy between:
+- Claude Code imports it: `claude-code/CLAUDE.md` contains `@~/.agents/RULES.md` (and
+  `@~/.agents/LOCAL.md` for personal rules) and nothing is duplicated.
+- Codex cannot import, so `codex/AGENTS.md` carries a verbatim copy of the **template text**
+  between:
 
   ```
   <!-- BEGIN SHARED RULES (synced from ~/.agents/RULES.md) -->
   <!-- END SHARED RULES -->
   ```
 
-  After editing `shared/RULES.md`, regenerate that block (`~/.agents/bin/sync-agents rules`, or
-  replace the block by hand) and commit both files together. Content outside the markers is
-  hand-written Codex guidance and must be preserved.
+  followed by an empty `<!-- BEGIN LOCAL RULES ... -->` / `<!-- END LOCAL RULES -->` pair that
+  `sync-agents rules` fills on a real machine from `~/.agents/LOCAL.md`.
+
+  After editing `shared/RULES.md`, replace the text between the SHARED markers with the new file
+  contents - byte for byte, `{{ }}` tags and the `installer:template` line included - and commit
+  both files together. Content outside the markers is hand-written Codex guidance and must be
+  preserved. Quick check that the block still equals the template:
+
+  ```bash
+  diff <(sed -n '/BEGIN SHARED RULES/,/END SHARED RULES/p' codex/AGENTS.md | sed '1d;$d') shared/RULES.md
+  ```
+
+`sync-agents rules` copies its input verbatim and never interprets template tags. On a live machine
+its input is the rendered `~/.agents/RULES.md`, so it fills the installed `~/.codex/AGENTS.md` with
+rendered text. To regenerate the repo block with it instead of by hand, give it a scratch home that
+holds the template: copy `shared/RULES.md` to `<scratch>/.agents/RULES.md` and `codex/AGENTS.md` to
+`<scratch>/.codex/AGENTS.md`, run `HOME=<scratch> shared/bin/sync-agents rules`, and copy the
+`AGENTS.md` back. Never copy a rendered file back into the repo: it would bake one machine's tools,
+versions and paths into a public mirror.
+
+## Templates and rendering
+
+Not every repo file is installed byte for byte. `install.sh` first renders `shared/`,
+`claude-code/` and `codex/` into a staging directory (`python3 -m installer render-tree`) from
+`~/.agents/config.json` plus the tools detected on the machine, and installs the staged copies.
+Rendering is opt-in per file, through markers in the file's first five lines (the marker line is
+dropped from the output):
+
+| Marker | Effect |
+| --- | --- |
+| `installer:template` (`<!-- installer:template -->` in Markdown, `# installer:template` in TOML, shell or YAML frontmatter) | The file is rendered: `{{ expr }}`, `{% if %}` / `{% elif %}` / `{% else %}`, `{% for %}`, filters `tilde`, `k`, `join`, `default`. Currently `shared/RULES.md`, `claude-code/commands/orchestrate.md` and `codex/AGENTS.md` (always rendered, because its marker sits inside the rules block) |
+| `installer:requires <name>...` / `installer:requires-any <name>...` | The file is skipped entirely when the named tools are off (`codex`, `gemini`, ...). Used on `codex-review-runner.md` and the `multi-*` commands |
+| `.installer-requires` file in a directory | The whole directory is skipped (and the file itself is never installed). Currently `claude-code/scripts/codex-review-pipeline/` |
+
+Path-specific **rewrite rules** need no marker: `model: opus|sonnet|haiku` in
+`claude-code/agents/*.md` and `model` / `model_reasoning_effort` in `codex/agents/*.toml` are mapped
+to the configured tiers; `codex/config.example.toml`, `claude-code/settings.example.json`,
+`codex/hooks.json` and `shared/mcp-servers.json` are patched (model, `[agents]` limits,
+`ECC_HOOK_PROFILE` / `ECC_DISABLED_HOOKS`) and have Headroom and Codex entries stripped when those
+are absent. The full list is in `docs/installer.md` and `installer/core/rewrite.py`.
+
+Rules for contributors:
+
+1. **The repo holds template text; installed copies are rendered.** `shared/RULES.md` and the
+   block in `codex/AGENTS.md` contain `{{ }}` / `{% %}` tags on purpose. Do not "fix" them, and do
+   not paste rendered output back into the repo.
+2. **A file without a marker is never interpreted**, so Jinja/Django/Helm examples inside skills
+   are safe. Do not add `installer:template` to a file that needs literal `{{`.
+3. Shared skills are copied, not rendered. Anything machine-specific in a skill must be phrased as
+   a pointer ("use the default vault listed under Environment & defaults in
+   `~/.agents/RULES.md`"), not a placeholder.
+4. Every change to a template must still render with the tools on **and** with Codex and Headroom
+   off (use a scratch `--home` with `{"tools":{"codex":"off"}}`), leave no `{{` or `{%` in the
+   output, and keep rendered JSON and TOML valid. `installer/tests/test_integration.py` renders
+   the real repo trees both ways.
+5. After changing `shared/RULES.md`, regenerate the `codex/AGENTS.md` block (previous section) in
+   the same commit.
+
+## Central config
+
+`~/.agents/config.json` is created from `shared/config.example.json` and belongs to the user.
+Its defaults live in two places that must stay identical: `DEFAULTS` in
+`installer/core/config.py` (with the typed `SETTINGS` schema that the CLI and the Settings tab
+drive) and `shared/config.example.json`. Adding a setting means all of: a `SETTINGS` entry, the
+default in both places, whatever template or rewrite rule consumes it, and a row in the key tables
+of `docs/installer.md` and `README.md`. The guardrail hook settings map to ECC's `ECC_HOOK_PROFILE`
+and `ECC_DISABLED_HOOKS` env vars in `~/.claude/settings.json`.
+
+## Extras
+
+`shared/extras.json` lists external integrations that are **not** skills (Impeccable, Figma MCP,
+Anthropic's `pptx` skill, ppt-master, presentation-skill): things with their own installer, a
+plugin or MCP server, an upstream too large to vendor, or a license that forbids redistribution.
+Do not vendor them into `shared/skills/`; add or edit an entry instead. The installer detects each
+one per tool and may run its install commands only after an explicit confirmation that third-party
+code will run (never on its own, never through a shell). The README "Extras" table and
+`docs/installer.md` must list the same five.
+
+## The Claude mod
+
+`mods/ai-suite/` is a Claude Code mod (hooks module plus manifest) and `.claude-plugin/marketplace.json`
+at the repo root makes this repository its marketplace. The mod is a thin layer over
+`python3 -m installer ... --json`: change behaviour in the installer first, then in the mod. Keep
+every `hooks/*.ts(x)` file under 400 lines, every `$` call written in full (`$.ui.open`), and run
+`claude plugin validate mods/ai-suite --strict` and `claude plugin test mods/ai-suite` before
+committing. The engine-written `mods/ai-suite/.claude-plugin/types/` folder is git-ignored and must
+stay so. Install instructions for users live in `mods/ai-suite/README.md`.
 
 ## Never delete
 
@@ -70,7 +166,16 @@ grep -rniE '(api[_-]?key|secret|token|password|bearer)[[:space:]]*[:=][[:space:]
 ```
 
 Check 1 is expected to be **empty**. The only tolerable exception is an obviously fictional
-placeholder inside sample output, and even there prefer `~/...`. Machine
+placeholder inside sample output, and even there prefer `~/...`. Today it reports exactly four
+matching lines, all pre-existing example strings that start with the `home` directory component of
+a sample Unix path: one in each of `auto-tmux-dev.js` (under `claude-code/scripts/hooks/` and
+`codex/scripts/ecc/hooks/`) and `test_parse_instinct.py` (under
+`claude-code/skills/continuous-learning-v2/scripts/` and `codex/skills/continuous-learning-v2/scripts/`).
+Anything beyond those four lines is a leak. `installer/`
+and the new docs are clean; `installer/tests/test_config.py` only names the two prefixes as
+strings that `installer/core/config.py` must never contain. Check 2 currently reports four
+documentation placeholders (`your-...` values in `shared/skills/x-api/SKILL.md` and
+`shared/skills/claude-api/SKILL.md`); a real-looking value is a leak. Machine
 state that Codex or Claude writes for itself - `[projects.*]` trust tables, `[hooks.state.*]`
 hashes, the `notify` hook, local `node_repl` MCP entries - must be stripped from the example
 config files, never copied between machines.
@@ -108,13 +213,22 @@ for d in shared/skills/*/ codex/skills/*/; do [ -f "$d/SKILL.md" ] || echo "NO S
 # No personal home paths
 grep -rnE '/(Users|home)/[^/ "]+' . --exclude-dir=.git
 
-# Installer is syntactically valid and its plan is sane
+# Installer is syntactically valid, its unit tests pass and its plan is sane
 bash -n install.sh
-./install.sh --dry-run --all
+python3 -m unittest discover -s installer/tests -t .
+./install.sh --headless --all --dry-run
+
+# Templates render cleanly (warnings 0). "excluded" lines are expected for tools this machine lacks
+python3 -m installer render-tree shared "$(mktemp -d)/shared" --rel shared
+python3 -m installer render-tree claude-code "$(mktemp -d)/claude-code" --rel claude-code
+python3 -m installer render-tree codex "$(mktemp -d)/codex" --rel codex
+
+# Block in codex/AGENTS.md still equals the RULES.md template (no output = in sync)
+diff <(sed -n '/BEGIN SHARED RULES/,/END SHARED RULES/p' codex/AGENTS.md | sed '1d;$d') shared/RULES.md
 
 # JSON validates
-for f in shared/mcp-servers.json shared/skill-lock.json claude-code/settings.example.json \
-         claude-code/hooks/hooks.json codex/hooks.json; do
+for f in shared/mcp-servers.json shared/skill-lock.json shared/config.example.json shared/extras.json \
+         claude-code/settings.example.json claude-code/hooks/hooks.json codex/hooks.json; do
   python3 -c "import json,sys;json.load(open(sys.argv[1]))" "$f" || echo "BAD JSON: $f"
 done
 
@@ -123,12 +237,17 @@ for f in codex/config.example.toml codex/agents/*.toml; do
   python3 -c "import tomllib,sys;tomllib.load(open(sys.argv[1],'rb'))" "$f" || echo "BAD TOML: $f"
 done
 
+# The Claude mod validates and its tests pass (needs the claude CLI)
+claude plugin validate mods/ai-suite --strict && claude plugin test mods/ai-suite
+
 # Counts still match what README.md claims
 ls shared/skills | wc -l; ls claude-code/agents/*.md | wc -l; ls claude-code/commands/*.md | wc -l
 ```
 
 If a count changes, update the README in the same commit. The README states exact numbers and a
-stale number is a bug.
+stale number is a bug. Today: 89 shared skills (plus 14 platform-specific pairs), 32 agents, 57
+commands, 11 Codex roles, 5 extras. `docs/installer.md`, `docs/layout-and-sync.md` and the three
+sub-READMEs (`shared/`, `claude-code/`, `codex/`) repeat some of those numbers; update them too.
 
 ## Commit messages
 
