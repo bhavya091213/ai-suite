@@ -1,0 +1,5 @@
+{
+  "name": "ai-suite",
+  "owner": { "name": "bhavya091213" },
+  "plugins": [{ "name": "ai-suite", "source": "./mods/ai-suite" }]
+}

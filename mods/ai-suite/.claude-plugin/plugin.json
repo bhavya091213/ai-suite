@@ -1,0 +1,27 @@
+{
+  "name": "ai-suite",
+  "version": "0.1.0",
+  "description": "Skills manager inside Claude Code: a Skills pane, a status line entry and /skills, /skills-check, as thin layers over the ai-suite installer CLI.",
+  "author": { "name": "bhavya091213" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "repoPath": {
+      "type": "string",
+      "title": "Repo path",
+      "description": "Your clone of the ai-suite repo (the folder holding install.sh and installer/). Leave empty to use, in order, this plugin's grandparent folder (when loaded with claude --plugin-dir from a checkout) or the marketplace clone Claude Code keeps at ~/.claude/plugins/marketplaces/ai-suite (after /plugin install).",
+      "default": ""
+    },
+    "python": {
+      "type": "string",
+      "title": "Python",
+      "description": "Python 3.9+ interpreter used to run python -m installer.",
+      "default": "python3"
+    },
+    "checkOnStart": {
+      "type": "boolean",
+      "title": "Check on start",
+      "description": "When a session starts, read skill status and git updates in the background (no network) and show a summary in the status line.",
+      "default": true
+    }
+  }
+}
