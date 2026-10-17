@@ -36,6 +36,213 @@
       "skillFolderHash": "40941bb7422db1815279e97c862f5e95a3b81a7f",
       "installedAt": "2026-09-04T16:47:43.521Z",
       "updatedAt": "2026-09-04T16:47:43.521Z"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "skillFolderHash": "d79e2a5bb4df4a386c2adcdd9ab8709bba28c3f6",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "userflow": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/userflow/SKILL.md",
+      "skillFolderHash": "8dbefe04138eb6b086bef2d4d44a1bf8dec7d754",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-ai-chat": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-ai-chat/SKILL.md",
+      "skillFolderHash": "62021e288a820db4cb97ecff4f4a44ebb533bf07",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-app-shell": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-app-shell/SKILL.md",
+      "skillFolderHash": "369fcacf568dd2872de2a3c6ff196f24278b3d50",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-auth": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-auth/SKILL.md",
+      "skillFolderHash": "67c01dd31099871b22df4051897b31d0d0874bca",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-checkout": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-checkout/SKILL.md",
+      "skillFolderHash": "2bf02a6aee073112f8c56a37b40c268ee06022d9",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-empty-states": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-empty-states/SKILL.md",
+      "skillFolderHash": "5335a6705ba49c925bf94327e7babc9eaae51850",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-errors": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-errors/SKILL.md",
+      "skillFolderHash": "e16a750330f2382ac611218d9c261534d5e46c79",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-forms": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-forms/SKILL.md",
+      "skillFolderHash": "e2b9e4dc9156f9e437158262af188d109ac86d6a",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-navigation": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-navigation/SKILL.md",
+      "skillFolderHash": "da93de433637ea67ec64abcde519aa54a7c0a87b",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-onboarding": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-onboarding/SKILL.md",
+      "skillFolderHash": "becf81e98604028cfe3af203dbc27aa388d1e26b",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-paywall": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-paywall/SKILL.md",
+      "skillFolderHash": "5c5685f1e587d326af916480181094ae1d297db6",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-permissions": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-permissions/SKILL.md",
+      "skillFolderHash": "6c9442888168f088171f5eed86d044248dbf87e2",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-search": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-search/SKILL.md",
+      "skillFolderHash": "c4ce2d43bbb11b162367675a0376a6881e420ade",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-settings": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-settings/SKILL.md",
+      "skillFolderHash": "099adffcd5c15399fd80412f70506b6743cf1f4b",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-sharing": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-sharing/SKILL.md",
+      "skillFolderHash": "b54a0d79d6fbd24154434becae049b8ffe1e0b0e",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "flow-tables": {
+      "source": "jpoindexter/ux-flow-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/jpoindexter/ux-flow-skills.git",
+      "skillPath": "skills/flow-tables/SKILL.md",
+      "skillFolderHash": "37871d61ab17cb6792ac713c0a09c9bb2e6f4620",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "information-architecture": {
+      "source": "rampstackco/claude-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/rampstackco/claude-skills.git",
+      "skillPath": "skills/information-architecture/SKILL.md",
+      "skillFolderHash": "44c5bc2150d14f2aa20025fee37c84f2c1906725",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "slide-deck": {
+      "source": "patrick204nqh/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/patrick204nqh/skills.git",
+      "skillPath": "skills/format/slide-deck/SKILL.md",
+      "skillFolderHash": "9e439614bb4879292deebce6d885bc0b5563b502",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "minto-pyramid": {
+      "source": "patrick204nqh/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/patrick204nqh/skills.git",
+      "skillPath": "skills/structure/minto-pyramid/SKILL.md",
+      "skillFolderHash": "83f0281628f76822a785f3e566caf48b4953490d",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "bluf": {
+      "source": "patrick204nqh/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/patrick204nqh/skills.git",
+      "skillPath": "skills/structure/bluf/SKILL.md",
+      "skillFolderHash": "128fc18b58fe61fb2f14db530762adcbefcc8417",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "exec-summary": {
+      "source": "patrick204nqh/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/patrick204nqh/skills.git",
+      "skillPath": "skills/audience/exec-summary/SKILL.md",
+      "skillFolderHash": "5c17516afa9bc36ccd65921cb1e6310db81b7f60",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
+    },
+    "executive-communication": {
+      "source": "refoundai/lenny-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/refoundai/lenny-skills.git",
+      "skillPath": "skills/executive-communication/SKILL.md",
+      "skillFolderHash": "026f41a3b8ca3c91036ca71286348bc8c893be93",
+      "installedAt": "2026-10-16T17:24:57.000Z",
+      "updatedAt": "2026-10-16T17:24:57.000Z"
     }
   },
   "dismissed": {

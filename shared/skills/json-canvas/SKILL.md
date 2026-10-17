@@ -5,11 +5,15 @@ description: Create and edit JSON Canvas files (.canvas) with nodes, edges, grou
 
 # JSON Canvas Skill
 
+When the user does not name a vault, use the default vault listed under 'Environment & defaults' in ~/.agents/RULES.md (set it with ./install.sh → Settings).
+
 If the canvas is based on project knowledge, first retrieve relevant chunks with:
 
 ```bash
-~/.codex/scripts/codex-knowledge search "<canvas topic or task>" --limit 8 --max-chars 12000
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "<canvas topic or task>" --limit 8 --max-chars 12000
 ```
+
+If the helper is unavailable (for example no `python3`), fall back to `rg -n "<keyword>" <vault or docs path>` and read only the matching slices with `sed -n`.
 
 Use retrieved notes and direct graph neighbors as source material. Do not load the entire vault or docs tree.
 

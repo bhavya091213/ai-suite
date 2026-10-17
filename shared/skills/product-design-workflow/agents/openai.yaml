@@ -1,0 +1,7 @@
+interface:
+  display_name: "Product Design Workflow"
+  short_description: "Five gated phases from product brief to sitemap, user flows, visual direction, prototype and verified build"
+  brand_color: "#C2410C"
+  default_prompt: "Design this product phase by phase: write the brief, then the sitemap and user flows for my approval, then show me distinct visual directions before prototyping anything"
+policy:
+  allow_implicit_invocation: true

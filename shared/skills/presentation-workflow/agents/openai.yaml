@@ -1,0 +1,7 @@
+interface:
+  display_name: "Presentation Workflow"
+  short_description: "Narrative first, deck second: story and outline for approval, then an editable .pptx or HTML deck, QA-checked"
+  brand_color: "#1D4ED8"
+  default_prompt: "Help me make a deck: interview me about the audience and the one takeaway, write the story and slide outline for my approval, then build and check the slides"
+policy:
+  allow_implicit_invocation: true

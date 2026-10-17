@@ -1,0 +1,7 @@
+interface:
+  display_name: "Lambda GPU Training"
+  short_description: "Phased training runs on Lambda cloud GPUs with user gates for cost and evaluation"
+  brand_color: "#7C3AED"
+  default_prompt: "Plan and run a model-training job on a Lambda cloud GPU, phase by phase, asking me before anything that costs money"
+policy:
+  allow_implicit_invocation: true

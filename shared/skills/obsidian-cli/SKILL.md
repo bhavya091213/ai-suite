@@ -5,6 +5,8 @@ description: Interact with Obsidian vaults using the Obsidian CLI to read, creat
 
 # Obsidian CLI
 
+When the user does not name a vault, use the default vault listed under 'Environment & defaults' in ~/.agents/RULES.md (set it with ./install.sh → Settings).
+
 Use the `obsidian` CLI to interact with a running Obsidian instance. Requires Obsidian to be open and command-line access enabled in Obsidian Settings > General > Advanced.
 
 On this machine, `~/.local/bin/obsidian` wraps Obsidian's bundled CLI at `/Applications/Obsidian.app/Contents/MacOS/obsidian-cli`.
@@ -12,8 +14,10 @@ On this machine, `~/.local/bin/obsidian` wraps Obsidian's bundled CLI at `/Appli
 For repository-contained vaults, use local retrieval before app automation when the task is about finding relevant note context:
 
 ```bash
-~/.codex/scripts/codex-knowledge search "<note task or question>"
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "<note task or question>"
 ```
+
+If the helper is unavailable (for example no `python3`), fall back to `rg -n "<keyword>" <vault or docs path>` and read only the matching slices with `sed -n`.
 
 ## Command reference
 

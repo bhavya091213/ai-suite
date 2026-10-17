@@ -1,0 +1,7 @@
+interface:
+  display_name: "Skill Forge"
+  short_description: "Turn a task or workflow into a tested, well-placed agent skill, gated on an approved spec"
+  brand_color: "#0F766E"
+  default_prompt: "Turn this workflow into a skill: interview me until the spec is unambiguous, get my approval, then draft, test and place it"
+policy:
+  allow_implicit_invocation: true

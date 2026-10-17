@@ -5,6 +5,8 @@ description: Use when coordinating Codex subagents, Trello tickets, Obsidian pro
 
 # Token-Efficient Orchestration
 
+When the user does not name a vault, use the default vault listed under 'Environment & defaults' in ~/.agents/RULES.md (set it with ./install.sh → Settings).
+
 Use this skill before spawning agents or updating orchestration memory.
 
 ## Defaults
@@ -19,7 +21,7 @@ Use this skill before spawning agents or updating orchestration memory.
 
 ## Retrieval Budget
 
-- First use `rg`, `rg --files`, or `~/.codex/scripts/codex-knowledge search`.
+- First use `rg`, `rg --files`, or `python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search` (the local-knowledge-retrieval helper; plain `rg` is the fallback when it is unavailable).
 - Default search budget: `--limit 5 --max-chars 8000`.
 - For small tasks: `--limit 3 --max-chars 4000`.
 - Read file slices with `sed -n`, not whole large files.

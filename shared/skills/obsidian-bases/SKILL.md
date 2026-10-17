@@ -5,11 +5,15 @@ description: Create and edit Obsidian Bases (.base files) with views, filters, f
 
 # Obsidian Bases Skill
 
+When the user does not name a vault, use the default vault listed under 'Environment & defaults' in ~/.agents/RULES.md (set it with ./install.sh → Settings).
+
 If the Base depends on existing notes, first retrieve matching note chunks and properties:
 
 ```bash
-~/.codex/scripts/codex-knowledge search "<base purpose, properties, tags, folders>" --limit 8 --max-chars 12000
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "<base purpose, properties, tags, folders>" --limit 8 --max-chars 12000
 ```
+
+If the helper is unavailable (for example no `python3`), fall back to `rg -n "<keyword>" <vault or docs path>` and read only the matching slices with `sed -n`.
 
 Use the retrieved file paths, tags, frontmatter, and folder hierarchy to design filters and views. Do not inspect the entire vault unless the user explicitly asks for a full audit.
 

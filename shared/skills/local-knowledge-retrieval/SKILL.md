@@ -5,6 +5,8 @@ description: Discover, index, and retrieve bounded context from repository-local
 
 # Local Knowledge Retrieval
 
+When the user does not name a vault, use the default vault listed under 'Environment & defaults' in ~/.agents/RULES.md (set it with ./install.sh → Settings).
+
 Use this skill as a context acquisition layer. The goal is to search first, retrieve second, and reason third without stuffing a whole vault or documentation tree into the prompt.
 
 ## Protocol
@@ -29,22 +31,24 @@ Failure to check an obvious local knowledge source before working is a protocol 
 
 ## Tool
 
-Run the bundled search helper from any repository:
+Run the bundled search helper from the repository root (it ships with this skill, so it works under Claude Code and Codex alike):
 
 ```bash
-~/.codex/scripts/codex-knowledge search "task or question"
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "task or question"
 ```
+
+Codex installs also expose the same helper as `~/.codex/scripts/codex-knowledge`.
 
 Useful commands:
 
 ```bash
-~/.codex/scripts/codex-knowledge discover --format markdown
-~/.codex/scripts/codex-knowledge index
-~/.codex/scripts/codex-knowledge search "authentication runbook" --limit 5 --max-chars 8000
-~/.codex/scripts/codex-knowledge search "Obsidian Bases formulas" --format json
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py discover --format markdown
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py index
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "authentication runbook" --limit 5 --max-chars 8000
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "Obsidian Bases formulas" --format json
 ```
 
-The helper stores SQLite FTS indexes under `~/.codex/cache/knowledge/`, keyed by repository path, so repositories are not dirtied by generated index files.
+The helper stores SQLite FTS indexes under `~/.codex/cache/knowledge/`, keyed by repository path, so repositories are not dirtied by generated index files. That cache location is used whichever CLI runs the helper; no Codex install is required.
 
 ## Ranking Signals
 
@@ -95,7 +99,7 @@ When spawning a subagent, include a compact retrieval block:
 ```markdown
 ## Knowledge Retrieval
 - root: <repo root>
-- command: ~/.codex/scripts/codex-knowledge search "<query>" --limit <n> --max-chars <budget>
+- command: python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "<query>" --limit <n> --max-chars <budget>
 - sources: <vault/docs/wiki/notes paths used>
 - selected: <path#heading entries>
 - gaps: <missing context to re-query, or "none">
@@ -103,7 +107,7 @@ When spawning a subagent, include a compact retrieval block:
 
 Child agents should re-query with their specific task, not blindly inherit irrelevant chunks. Give them the retrieval command and selected source names, not full retrieved text unless it is essential.
 
-For subagents whose primary output is Markdown, Obsidian notes, docs, prompt recipes, or `SKILL.md` files, route to the `markdown_writer` agent role when available. That role is intentionally lower model/effort for Markdown production.
+For subagents whose primary output is Markdown, Obsidian notes, docs, prompt recipes, or `SKILL.md` files, route to the `markdown_writer` agent role when available (a Codex role; under Claude Code spawn a light-tier subagent instead). That role is intentionally lower model/effort for Markdown production.
 
 ## Fallbacks
 

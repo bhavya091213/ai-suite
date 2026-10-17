@@ -5,13 +5,17 @@ description: Create and edit Obsidian Flavored Markdown with wikilinks, embeds, 
 
 # Obsidian Flavored Markdown Skill
 
+When the user does not name a vault, use the default vault listed under 'Environment & defaults' in ~/.agents/RULES.md (set it with ./install.sh → Settings).
+
 Create and edit valid Obsidian Flavored Markdown. Obsidian extends CommonMark and GFM with wikilinks, embeds, callouts, properties, comments, and other syntax. This skill covers only Obsidian-specific extensions -- standard Markdown (headings, bold, italic, lists, quotes, code blocks, tables) is assumed knowledge.
 
 Before creating or editing notes in a repository-contained vault, retrieve only the relevant local context:
 
 ```bash
-~/.codex/scripts/codex-knowledge search "<note topic or editing task>" --limit 5 --max-chars 8000
+python3 ~/.agents/skills/local-knowledge-retrieval/scripts/knowledge_index.py search "<note topic or editing task>" --limit 5 --max-chars 8000
 ```
+
+If the helper is unavailable (for example no `python3`), fall back to `rg -n "<keyword>" <vault or docs path>` and read only the matching slices with `sed -n`.
 
 Use retrieved headings, wikilinks, tags, aliases, and graph neighbors to choose links and frontmatter. Do not load the whole vault.
 
