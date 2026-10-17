@@ -4,7 +4,7 @@
 import type { EngineInterface } from 'claude-code'
 import type { AiSuiteScopeFilter } from '../types'
 import { notableLines, runCli, truncate } from './cli'
-import type { Settings } from './cli'
+import type { Cfg, Settings } from './cli'
 import { idOf } from './commands'
 import type { Named } from './commands'
 import {
@@ -26,6 +26,17 @@ import { getDetail, getSnapshots, getView, setCustomKey, setDetail, setMessage, 
 import { filterMissing, updatable } from './summary'
 
 type Step = { args: string[]; timeoutMs: number }
+
+/** After something changed on disk: every snapshot and the detail card under the view are stale. */
+export async function forgetAll($: EngineInterface): Promise<void> {
+  await invalidateAll($)
+  await setDetail($, null)
+}
+
+/** Re-reads what the current view shows, and the Overview's numbers when that worked. */
+export async function reread($: EngineInterface, cfg: Cfg): Promise<void> {
+  if (await refreshView($, cfg, await getView($), false)) await refreshView($, cfg, 'overview', false)
+}
 
 const step = (args: string[], timeoutMs = SLOW_MS): Step => ({ args, timeoutMs })
 
@@ -63,12 +74,11 @@ async function mutate(
       notes.push(...notableLines(out.stdout, cfg.home))
       printed.push(cfg.home === '' ? out.stdout : out.stdout.split(cfg.home).join('~'))
     }
-    await invalidateAll($)
-    await setDetail($, null)
+    await forgetAll($)
     const headline = didSomething ? done : 'Nothing to do.'
     await setMessage($, didSomething ? 'ok' : 'info', truncate([headline, ...notes].join(' · '), 400))
     $.ui.toast(headline)
-    if (await refreshView($, cfg, await getView($), false)) await refreshView($, cfg, 'overview', false)
+    await reread($, cfg)
     output = printed.join('\n')
   })
   await refreshStatusLine($)

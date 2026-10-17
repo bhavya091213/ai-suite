@@ -16,6 +16,7 @@ import {
   getBusy,
   getSnapshots,
   patchSnapshot,
+  pruneSelections,
   resetSnapshots,
   setBusy,
   setMessage,
@@ -59,7 +60,11 @@ export async function load(
       ? { data: result.data, fetchedAt: now, error: null }
       : { ...previous, error: result.error },
   )
-  if (result.ok) return null
+  if (result.ok) {
+    // a rescan of the skills drops the ticked ones that no longer exist
+    if (spec.name === 'status') await pruneSelections($, (await getSnapshots($)).status.data ?? [])
+    return null
+  }
   if (!isQuiet) await fail($, `${spec.label} failed: ${result.error}`)
   return result.error
 }

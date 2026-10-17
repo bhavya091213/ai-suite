@@ -2,18 +2,24 @@
 // the confirm card: the commands that wait for a Yes, how they are remembered in the
 // `pendingConfirm` state, and the words the card says. Pure; no `$` in here.
 import type {
+  AiSuiteAnchor,
   AiSuiteInstalledFilter,
   AiSuiteScopeFilter,
   AiSuiteView,
 } from '../types'
 import { settingLabel } from './presets'
+import { namesLine } from './selection'
 import type { PaneData } from './state'
 import { filterMissing, plural, updatable } from './summary'
 
 export type Named = { scope: string; name: string }
 
-/** The two views that filter by tag, which are also the ids of their pagers. */
+/** The two views that filter by tag and tick skills, which are also the ids of their pagers. */
 export type TagList = 'install' | 'installed'
+export type SelectList = TagList
+
+/** What a selection bar applies to every ticked skill it names. */
+export type BulkVerb = 'install' | 'update' | 'relink' | 'retire'
 
 export type Command =
   | { kind: 'view'; view: AiSuiteView; installed?: AiSuiteInstalledFilter }
@@ -23,6 +29,10 @@ export type Command =
   | { kind: 'state'; value: AiSuiteInstalledFilter }
   | { kind: 'query'; text: string }
   | { kind: 'tag'; list: TagList; value: string }
+  | { kind: 'select'; list: SelectList; id: string }
+  | { kind: 'select-all'; list: SelectList; ids: string[] }
+  | { kind: 'clear-selection'; list: SelectList }
+  | { kind: 'bulk'; list: SelectList; verb: BulkVerb; ids: string[] }
   | { kind: 'install'; row: Named }
   | { kind: 'install-all'; scope: AiSuiteScopeFilter; query: string; tag: string }
   | { kind: 'update'; row: Named }
@@ -44,8 +54,18 @@ export type Command =
   | { kind: 'yes' }
   | { kind: 'no' }
 
-/** One press: the control's key, what it asks for, and whether a confirm card comes first. */
-export type Act = { key: string; command: Command; confirm?: true }
+/** One press: the control's key, what it asks for, and whether a confirm card comes first (and, if so, where it is drawn). */
+export type Act = { key: string; command: Command; confirm?: true; anchor?: AiSuiteAnchor }
+
+/** The confirm card of a press that named no place: under the header. */
+export const TOP: AiSuiteAnchor = { kind: 'top', key: 'pane' }
+/** Under the skill (or workflow) card whose Box key is `key`. */
+export const cardAnchor = (key: string): AiSuiteAnchor => ({ kind: 'card', key })
+/** Under the button row (or control) the view named `key`. */
+export const rowAnchor = (key: string): AiSuiteAnchor => ({ kind: 'row', key })
+/** In the place of a list's selection bar. */
+export const barAnchor = (list: SelectList): AiSuiteAnchor => ({ kind: 'bar', key: list })
+export const sameAnchor = (a: AiSuiteAnchor, b: AiSuiteAnchor): boolean => a.kind === b.kind && a.key === b.key
 
 export const idOf = (row: Named): string => `${row.scope}/${row.name}`
 
@@ -53,6 +73,7 @@ export const idOf = (row: Named): string => `${row.scope}/${row.name}`
 
 const CONFIRMABLE: readonly string[] = [
   'retire',
+  'bulk',
   'pull',
   'install-all',
   'update-changed',
@@ -77,8 +98,8 @@ export function decodeConfirm(text: string): Command | null {
   }
 }
 
-/** The card's words: the question, one sentence of consequence, and the Yes button's label. */
-export type Confirm = { question: string; detail: string; yes: string }
+/** The card's words: the question, the names it is about (a bulk action), one sentence of consequence, and the Yes button's label. */
+export type Confirm = { question: string; names?: string; detail: string; yes: string }
 
 const BACKUPS = '~/.agents/backups'
 
@@ -92,6 +113,13 @@ export function confirmOf(command: Command, data: PaneData): Confirm {
         question: `Retire ${idOf(command.row)}?`,
         detail: `Its files move to ${backups}; nothing is deleted.`,
         yes: 'Yes, retire',
+      }
+    case 'bulk':
+      return {
+        question: `Retire ${plural(command.ids.length, 'skill', 'skills')}?`,
+        names: namesLine(command.ids),
+        detail: `Their files move to ${backups}; nothing is deleted.`,
+        yes: `Yes, retire ${command.ids.length}`,
       }
     case 'pull': {
       const behind = updates?.git.behind ?? 0

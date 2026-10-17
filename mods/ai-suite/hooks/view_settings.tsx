@@ -2,12 +2,13 @@
 // `config set`; free text is only reached through `Custom…` (or `Change…` for the two folders).
 import type { AiSuiteConfig } from '../types'
 import { shortenHome } from './cli'
+import { rowAnchor } from './commands'
 import type { Command } from './commands'
 import { CUSTOM, NONE, SECTIONS, selectChoice, settingText } from './presets'
 import type { SettingSection, SettingSpec } from './presets'
-import { actButton, actionRow, buttonRow, card, column, entry, fit, heading, line, linesOf } from './ui'
+import { above, actButton, actionRow, buttonRow, card, column, entry, fit, heading, line, linesOf } from './ui'
 import type { Env } from './ui'
-import { LABEL_WIDTH, indent, labelCell, note, pickRow } from './ui_parts'
+import { LABEL_WIDTH, confirmAfter, indent, labelCell, note, pickRow } from './ui_parts'
 
 const OUTPUT_LINES = 14
 
@@ -133,15 +134,25 @@ function footerCard(env: Env): JSX.Element {
   const reset = (key: string): Promise<void> =>
     key === NONE
       ? Promise.resolve()
-      : env.dispatch({ key: 'reset-setting', command: { kind: 'reset', key }, confirm: true })
+      : env.dispatch({ key: 'reset-setting', command: { kind: 'reset', key }, confirm: true, anchor: rowAnchor('settings-reset') })
   return card(
     env,
     'settings-actions',
     null,
     heading(env, 'Apply and reset'),
     line(env, 'Picks are saved as you make them. Apply copies them into the tools on this machine.', 'dim'),
-    actionRow(env, actButton(env, { key: 'apply', command: { kind: 'apply' }, confirm: true }, 'Apply to this machine…', { primary: true })),
+    actionRow(
+      env,
+      actButton(
+        env,
+        { key: 'apply', command: { kind: 'apply' }, confirm: true, anchor: rowAnchor('settings-apply') },
+        'Apply to this machine…',
+        { primary: true },
+      ),
+    ),
+    confirmAfter(env, rowAnchor('settings-apply')),
     pickRow(env, 'reset-setting', 'Reset', { options: RESET_OPTIONS, value: NONE, onSelect: reset }),
+    confirmAfter(env, rowAnchor('settings-reset')),
   )
 }
 
@@ -186,7 +197,7 @@ export function settings(env: Env): JSX.Element {
       {values !== null && SECTIONS.map(section => sectionCard(env, section, values))}
       {values !== null && footerCard(env)}
       {applyOutput(env)}
-      <Box>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>
+      <Box {...above(env)}>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>
     </Box>
   )
 }

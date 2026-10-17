@@ -106,6 +106,16 @@ export type AiSuiteFilters = {
 /** A card shown under a view's list: a skill's file tree, a workflow's SKILL.md, or the apply output. */
 export type AiSuiteDetail = { kind: 'files' | 'preview' | 'apply'; id: string; text: string }
 
+/**
+ * Where a pending confirm card is drawn: `card` directly under the skill (or workflow) card whose
+ * Box key is `key`, `row` directly under the button row named `key`, `bar` in the place of the
+ * selection bar of the list named `key`, `top` under the header (nothing more specific was named).
+ */
+export type AiSuiteAnchor = { kind: 'card' | 'row' | 'bar' | 'top'; key: string }
+
+/** The confirm card that is up: the command it runs on Yes, encoded as text, and where it is drawn. */
+export type AiSuiteConfirm = { command: string; anchor: AiSuiteAnchor }
+
 /** The pane's message row. */
 export type AiSuiteMessage = { kind: 'info' | 'ok' | 'error'; text: string }
 
@@ -125,11 +135,15 @@ declare module 'claude-code' {
       repo: AiSuiteRepo | null
       snapshots: AiSuiteSnapshots
       busy: AiSuiteBusy | null
-      /** The confirm card that is up: the command it will run if answered Yes, encoded as text; null when none. */
-      pendingConfirm: string | null
+      /** The confirm card that is up: the command it will run if answered Yes (encoded as text) and where it is drawn; null when none. */
+      pendingConfirm: AiSuiteConfirm | null
       message: AiSuiteMessage | null
       /** The setting whose Custom... field is open in Settings, or null. */
       customKey: string | null
+      /** The skills ticked on the Install view, as `scope/name` keys. */
+      installSelection: string[]
+      /** The skills ticked on the Installed view, as `scope/name` keys. */
+      installedSelection: string[]
       /** The files / preview / apply card under the current view, or null. */
       detail: AiSuiteDetail | null
       /** True once Hide was pressed on the band above the prompt; lasts for the session. */

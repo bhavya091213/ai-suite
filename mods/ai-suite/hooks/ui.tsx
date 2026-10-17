@@ -1,5 +1,5 @@
-// The pieces every view is built from: the surface-aware environment, text and buttons, cards,
-// badges and the skill card. All of it is drawing: a pure function of PaneData, with a button's
+// The pieces every view is built from: the surface-aware environment, text and buttons, filter
+// rows and cards (badges and the skill card are in ui_skill.tsx). All of it is drawing: a pure function of PaneData, with a button's
 // press handed to `dispatch` (the hook binds its `$`). The surface branch lives here and in
 // ui_parts.tsx / pane.tsx, so the views stay surface-agnostic: the terminal is a character grid
 // (bordered cards, hotkeys, `━` bars), the desktop app and the editor are not (padded cards, a
@@ -68,6 +68,12 @@ export const column = (env: Env): Pick<BoxProps, 'flexDirection' | 'gap'> =>
 
 /** The blank row under a terminal block; the desktop spaces with `gap` instead. */
 export const below = (env: Env): Pick<BoxProps, 'marginBottom'> => (env.isDesktop ? {} : { marginBottom: 1 })
+
+/** A blank row over a desktop block that would otherwise sit on the one above it (the terminal's cards bring their own margin). */
+export const above = (env: Env): Pick<BoxProps, 'marginTop'> => (env.isDesktop ? { marginTop: 1 } : {})
+
+/** A blank row under a desktop block the pane's `gap` does not hold off the next (the terminal's cards bring their own margin). */
+export const apart = (env: Env): Pick<BoxProps, 'marginBottom'> => (env.isDesktop ? { marginBottom: 1 } : {})
 
 // --------------------------------------------------------------------- text
 
@@ -158,6 +164,10 @@ export type Aside = { key: string; element: JSX.Element; width: number }
 
 /** Cells the pane's own padding takes from a desktop row (two on each side). */
 const DESKTOP_GUTTER = 4
+/** Cells a chip takes beyond its label: the gap after it and, on the desktop, a native button's padding. */
+const chipCells = (env: Env): number => (env.isDesktop ? 4 : 2)
+/** Cells a desktop row keeps free between its chips and the control at its edge. */
+const ASIDE_ROOM = 4
 
 /** A row of plain filter chips; the chosen one is bold and underlined. */
 export function chips(env: Env, items: readonly ChipItem[], aside?: Aside): JSX.Element {
@@ -168,18 +178,27 @@ export function chips(env: Env, items: readonly ChipItem[], aside?: Aside): JSX.
     </Box>
   )
   if (aside === undefined) return row(below(env))
-  // the labels, two cells after each (between them, and before the aside)
-  const used = items.reduce((sum, item) => sum + item.label.length + 2, 0) + aside.width
-  const isBeside = used <= env.columns - (env.isDesktop ? DESKTOP_GUTTER : 0)
+  const used = items.reduce((sum, item) => sum + item.label.length + chipCells(env), 0) + aside.width
+  const isBeside = used + (env.isDesktop ? ASIDE_ROOM : 0) <= env.columns - (env.isDesktop ? DESKTOP_GUTTER : 0)
   return isBeside ? (
     <Box key={aside.key} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} {...below(env)}>
       {row({})}
       {aside.element}
     </Box>
   ) : (
-    <Box key={aside.key} flexDirection="column" {...below(env)}>
+    <Box key={aside.key} flexDirection="column" {...(env.isDesktop ? { gap: 1 } : {})} {...below(env)}>
       {row({})}
       {aside.element}
+    </Box>
+  )
+}
+
+/** The filter controls of a list (chips, name field), kept together; the list starts after one blank row. */
+export function filterArea(env: Env, ...children: Child[]): JSX.Element {
+  const { Box } = env.els
+  return (
+    <Box key="filter-area" flexDirection="column" {...(env.isDesktop ? { gap: 1 } : {})} {...apart(env)}>
+      {children}
     </Box>
   )
 }
@@ -213,6 +232,14 @@ export function actionRow(env: Env, ...buttons: Child[]): JSX.Element | null {
   )
 }
 
+/** A view's own row of actions (not one inside a card): `actionRow` set a blank row off the block above it. */
+export function viewRow(env: Env, ...buttons: Child[]): JSX.Element | null {
+  const row = actionRow(env, ...buttons)
+  if (row === null) return null
+  const { Box } = env.els
+  return <Box {...above(env)}>{row}</Box>
+}
+
 // --------------------------------------------------------------------- cards
 
 const BORDERS: Record<Tone, string> = { ...HUES, plain: 'inactive', dim: 'inactive' }
@@ -221,7 +248,7 @@ export function card(env: Env, key: string, accent: Tone | null, ...children: Ch
   const { Box } = env.els
   const look: BoxProps = env.isDesktop
     ? { paddingX: 2, paddingY: 1, gap: 1, width: '100%', borderColor: BORDERS[accent ?? 'plain'] }
-    : { paddingX: 1, paddingY: 0, marginBottom: 1, ...(accent === null ? {} : { borderColor: accent }) }
+    : { paddingX: 1, paddingY: 0, marginBottom: 1, ...(accent === null ? {} : { borderColor: BORDERS[accent] }) }
   return (
     <Box key={key} borderStyle="round" flexDirection="column" {...look}>
       {children}
@@ -270,91 +297,4 @@ export function titleRow(env: Env, left: readonly Child[], right: readonly JSX.E
 export function entry(env: Env, ...lines: Child[]): JSX.Element {
   const { Box } = env.els
   return <Box flexDirection="column">{lines}</Box>
-}
-
-// -------------------------------------------------------------------- badges
-
-/** The terminal draws `glyph word` in the tone; the desktop draws `● word` in the matching theme colour. */
-export type Badge = { glyph: string; word: string; tone: Tone }
-
-export const STATE_BADGES: Record<string, Badge> = {
-  installed: { glyph: '✓', word: 'installed', tone: 'success' },
-  modified: { glyph: '≠', word: 'modified', tone: 'warning' },
-  'not-installed': { glyph: '·', word: 'missing', tone: 'dim' },
-  foreign: { glyph: '?', word: 'foreign', tone: 'magenta' },
-  ignored: { glyph: '⚙', word: 'tool-managed', tone: 'dim' },
-}
-export const PROBLEM_BADGE: Badge = { glyph: '!', word: 'problem', tone: 'error' }
-
-export const badgeWidth = (env: Env, item: Badge): number => item.word.length + (env.isDesktop ? 2 : item.glyph.length + 1)
-
-export function badge(env: Env, item: Badge): JSX.Element {
-  const { Text } = env.els
-  return env.isDesktop ? (
-    <Text color={hue(item.tone)} wrap="truncate">{`● ${item.word}`}</Text>
-  ) : (
-    <Text {...toneProps(item.tone)} wrap="truncate">{`${item.glyph} ${item.word}`}</Text>
-  )
-}
-
-export type SkillCard = {
-  scope: string
-  name: string
-  /** Drawn dim after the scope (`shared · design · frontend`, the first three); left off when there are none or the card is too narrow for them. */
-  tags?: readonly string[]
-  badges: readonly Badge[]
-  /** The second line: the description, or what is wrong. */
-  summary: { text: string; tone: Tone }
-  /** Something drawn at the left of the button line (the link dots). */
-  aside?: JSX.Element | null
-  buttons: readonly Child[]
-}
-
-/** Room the name keeps on the title line before the tags give way. */
-const NAME_ROOM = 12
-/** Tags a card shows; the rest are one pick away in the Select. */
-const CARD_TAGS = 3
-
-/** `· design · frontend`, dim, cut to the room the line has beside the scope, the badges and a short name; null when there is none. */
-function tagLine(env: Env, spec: SkillCard, taken: number): string | null {
-  const shown = (spec.tags ?? []).slice(0, CARD_TAGS)
-  if (shown.length === 0) return null
-  const room = env.inner - taken - Math.min(spec.name.length, NAME_ROOM) - 1
-  return room < 8 ? null : truncate(`· ${shown.join(' · ')}`, room)
-}
-
-/** The skill card of the spec: name, scope, tags and state badges; one description line; one button line. */
-export function skillCard(env: Env, spec: SkillCard): JSX.Element {
-  const { Box, Text } = env.els
-  const scope = env.isDesktop ? spec.scope : `[${spec.scope}]`
-  const taken = scope.length + spec.badges.reduce((sum, item) => sum + badgeWidth(env, item) + 1, 0) + (env.isDesktop ? 4 : 1)
-  const tagText = tagLine(env, spec, taken)
-  const used = taken + (tagText === null ? 0 : tagText.length + 1)
-  const buttons = buttonRow(env, ...spec.buttons)
-  return card(
-    env,
-    `card:${spec.scope}/${spec.name}`,
-    null,
-    entry(
-      env,
-      titleRow(
-        env,
-        [
-          <Text bold wrap="truncate">{fit(env, spec.name, used)}</Text>,
-          <Text dimColor>{scope}</Text>,
-          tagText !== null && <Text dimColor wrap="truncate">{tagText}</Text>,
-        ],
-        spec.badges.map(item => badge(env, item)),
-      ),
-      <Text {...toneProps(spec.summary.tone)} wrap="truncate">{fit(env, spec.summary.text)}</Text>,
-    ),
-    spec.aside ? (
-      <Box flexDirection="row" justifyContent="space-between">
-        {spec.aside}
-        {buttons}
-      </Box>
-    ) : (
-      buttons
-    ),
-  )
 }

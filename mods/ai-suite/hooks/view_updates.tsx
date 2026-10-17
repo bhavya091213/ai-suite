@@ -1,9 +1,14 @@
 // Updates: the git state of the repo, the commits you are behind, and the skills that changed upstream.
 import type { AiSuiteGit, AiSuiteUpdates } from '../types'
+import { rowAnchor } from './commands'
 import { CARDS_PER_PAGE, pageOf, plural, updatable } from './summary'
-import { STATE_BADGES, actButton, actionRow, buttonRow, card, column, entry, fit, heading, line, skillCard } from './ui'
+import { above, actButton, buttonRow, card, column, entry, fit, heading, line, viewRow } from './ui'
 import type { Env } from './ui'
-import { empty, note, pager } from './ui_parts'
+import { confirmAfter, empty, note, pager } from './ui_parts'
+import { STATE_BADGES, skillCard } from './ui_skill'
+
+const GIT = 'git'
+const CHANGED = 'update-changed'
 
 const COMMITS_SHOWN = 5
 
@@ -27,8 +32,10 @@ function gitCard(env: Env, git: AiSuiteGit): JSX.Element {
     buttonRow(
       env,
       actButton(env, { key: 'fetch', command: { kind: 'fetch' } }, 'Fetch'),
-      git.upstream !== '' && actButton(env, { key: 'pull', command: { kind: 'pull' }, confirm: true }, pull),
+      git.upstream !== '' &&
+        actButton(env, { key: 'pull', command: { kind: 'pull' }, confirm: true, anchor: rowAnchor(GIT) }, pull),
     ),
+    confirmAfter(env, rowAnchor(GIT)),
   )
 }
 
@@ -82,15 +89,16 @@ function changedCards(env: Env, found: AiSuiteUpdates): JSX.Element {
       })}
       {pager(env, 'updates', paged, found.changed.length, CARDS_PER_PAGE)}
       {targets.length > 0 &&
-        actionRow(
+        viewRow(
           env,
           actButton(
             env,
-            { key: 'update-changed', command: { kind: 'update-changed' }, confirm: true },
+            { key: 'update-changed', command: { kind: 'update-changed' }, confirm: true, anchor: rowAnchor(CHANGED) },
             `Update ${plural(targets.length, 'changed skill', 'changed skills')}…`,
             { primary: true },
           ),
         )}
+      {confirmAfter(env, rowAnchor(CHANGED))}
     </Box>
   )
 }
@@ -107,7 +115,9 @@ export function updates(env: Env): JSX.Element {
       {isQuiet && empty(env, 'Nothing has changed upstream.', actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh'))}
       {found !== null && found.commits.length > 0 && commitsCard(env, found.commits)}
       {found !== null && found.changed.length > 0 && changedCards(env, found)}
-      {found !== null && !isQuiet && <Box>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>}
+      {found !== null && !isQuiet && (
+        <Box {...above(env)}>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>
+      )}
     </Box>
   )
 }

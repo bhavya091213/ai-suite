@@ -5,8 +5,9 @@ import type { EngineInterface } from 'claude-code'
 import type { AiSuiteInstalledFilter, AiSuiteView } from '../types'
 import { errText } from './cli'
 import type { Settings } from './cli'
-import { decodeConfirm, encodeConfirm, idOf } from './commands'
+import { TOP, decodeConfirm, encodeConfirm, idOf } from './commands'
 import type { Act, Command } from './commands'
+import { bulkRun } from './bulk'
 import {
   DOCTOR,
   STATUS,
@@ -37,7 +38,9 @@ import {
 } from './mutations'
 import {
   PANE_ID,
+  addSelected,
   clearMessage,
+  clearSelected,
   getPending,
   getRepo,
   getSnapshots,
@@ -51,6 +54,7 @@ import {
   setPending,
   setView,
   takePending,
+  toggleSelected,
 } from './state'
 import { checkSummary } from './summary'
 
@@ -137,6 +141,14 @@ async function perform($: EngineInterface, settings: Settings, command: Command)
         ? { installTag: command.value }
         : { installedTag: command.value })
       return setPage($, command.list, 0)
+    case 'select':
+      return toggleSelected($, command.list, command.id)
+    case 'select-all':
+      return addSelected($, command.list, command.ids)
+    case 'clear-selection':
+      return clearSelected($, command.list)
+    case 'bulk':
+      return bulkRun($, settings, command.list, command.verb, command.ids)
     case 'install':
       return installOne($, settings, command.row)
     case 'install-all':
@@ -179,11 +191,26 @@ async function perform($: EngineInterface, settings: Settings, command: Command)
   }
 }
 
-/** Arms a confirm card and brings the top of the pane (where the card is drawn) into view. */
-async function askConfirm($: EngineInterface, command: Command): Promise<void> {
-  await setPending($, encodeConfirm(command))
+/** Scrolls the element `key` of the pane into view; false when that was refused (the element may not be drawn yet). */
+async function reveal($: EngineInterface, key: string): Promise<boolean> {
   try {
-    await $.ui.scroll({ to: 'start', in: PANE_ID })
+    return (await $.ui.scroll({ to: { key }, in: PANE_ID })).deny === undefined
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Arms a confirm card where the press asked for it (under a card, a button row or the bar; the
+ * top of the pane when it named nothing) and brings it into view: the card itself if it is
+ * already drawn, else the button that was pressed, which always is.
+ */
+async function askConfirm($: EngineInterface, act: Act): Promise<void> {
+  const anchor = act.anchor ?? TOP
+  await setPending($, { command: encodeConfirm(act.command), anchor })
+  try {
+    if (anchor.kind === 'top') await $.ui.scroll({ to: 'start', in: PANE_ID })
+    else if (!(await reveal($, 'confirm'))) await reveal($, act.key)
   } catch {
     // the card is still drawn; only the scroll was refused
   }
@@ -200,13 +227,13 @@ export async function pressAct($: EngineInterface, settings: Settings, act: Act)
     if (kind === 'no') await setPending($, null)
     if (kind !== 'yes') return
     const taken = await takePending($)
-    const command = taken === null ? null : decodeConfirm(taken)
+    const command = taken === null ? null : decodeConfirm(taken.command)
     if (command !== null) await perform($, settings, command)
     return
   }
   if (kind === 'yes' || kind === 'no') return
   if (act.confirm === true) {
-    await askConfirm($, act.command)
+    await askConfirm($, act)
     return
   }
   await clearMessage($)

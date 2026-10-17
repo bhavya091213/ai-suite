@@ -1,25 +1,30 @@
-// Installed: every skill on this machine as a card, narrowed by filter chips, with the repairs it offers.
+// Installed: every skill on this machine as a card, narrowed by filter chips, with the repairs it
+// offers, a tick box on every card and, once some are ticked, a bar to repair or retire them together.
 import type { AiSuiteInstalledFilter, AiSuiteSkillRow } from '../types'
-import { idOf } from './commands'
+import { cardAnchor, idOf } from './commands'
 import { ALL_TAGS } from './presets'
+import { chosenRows, installedPlan } from './selection'
 import { CARDS_PER_PAGE, filterInstalled, pageOf, tagCounts } from './summary'
 import {
-  PROBLEM_BADGE,
-  STATE_BADGES,
+  above,
   actButton,
   buttonRow,
   card,
   chips,
   column,
   entry,
+  filterArea,
   heading,
   hue,
   linesOf,
-  skillCard,
   toneProps,
 } from './ui'
-import type { Badge, Env, Tone } from './ui'
-import { empty, note, pager, tagAside, tagEmpty } from './ui_parts'
+import type { Env, Tone } from './ui'
+import { confirmAfter, empty, note, pager, tagAside, tagEmpty } from './ui_parts'
+import { selectionBar } from './ui_select'
+import type { BarVerb } from './ui_select'
+import { PROBLEM_BADGE, STATE_BADGES, skillCard } from './ui_skill'
+import type { Badge } from './ui_skill'
 
 const FILTER_CHIPS: readonly { value: AiSuiteInstalledFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -87,16 +92,40 @@ function installedCard(env: Env, row: AiSuiteSkillRow): JSX.Element {
     badges: row.hasProblem ? [stateBadge, PROBLEM_BADGE] : [stateBadge],
     summary,
     aside: row.scope === 'shared' ? linkDots(env, row) : null,
+    tick: {
+      isOn: env.data.installedSelection.includes(id),
+      act: { key: `select:${id}`, command: { kind: 'select', list: 'installed', id } },
+    },
     buttons: [
       row.state === 'modified' &&
         actButton(env, { key: `update:${id}`, command: { kind: 'update', row: named } }, 'Update', { lead: true }),
       row.canRelink && actButton(env, { key: `relink:${id}`, command: { kind: 'relink', row: named } }, 'Relink'),
       row.canRetire &&
-        actButton(env, { key: `retire:${id}`, command: { kind: 'retire', row: named }, confirm: true }, 'Retire…'),
+        actButton(
+          env,
+          { key: `retire:${id}`, command: { kind: 'retire', row: named }, confirm: true, anchor: cardAnchor(`card:${id}`) },
+          'Retire…',
+        ),
       row.state !== 'ignored' &&
         actButton(env, { key: `files:${id}`, command: { kind: 'files', row: named } }, isFilesOpen ? 'Hide files' : 'Files'),
     ],
   })
+}
+
+/** The bar's buttons: what each can do to the ticked skills, counting only the ones it applies to. */
+function barVerbs(chosen: readonly AiSuiteSkillRow[]): BarVerb[] {
+  const plan = installedPlan(chosen)
+  const verbs: BarVerb[] = []
+  if (plan.update.length > 0) {
+    verbs.push({ verb: 'update', ids: plan.update.map(idOf), label: `Update ${plan.update.length}`, isPrimary: true })
+  }
+  if (plan.relink.length > 0) {
+    verbs.push({ verb: 'relink', ids: plan.relink.map(idOf), label: `Relink ${plan.relink.length}` })
+  }
+  if (plan.retire.length > 0) {
+    verbs.push({ verb: 'retire', ids: plan.retire.map(idOf), label: `Retire ${plan.retire.length}…`, isConfirmed: true })
+  }
+  return verbs
 }
 
 export function installed(env: Env): JSX.Element {
@@ -105,6 +134,7 @@ export function installed(env: Env): JSX.Element {
   const { installed: filter, installedTag: tag } = env.data.filters
   const everything = filterInstalled(status.data ?? [], 'all')
   const shown = filterInstalled(status.data ?? [], filter, tag)
+  const chosen = chosenRows(everything, env.data.installedSelection)
   // the tag is what hides everything when lifting it would show something
   const isTagEmpty = tag !== ALL_TAGS && filterInstalled(status.data ?? [], filter).length > 0
   const paged = pageOf(shown, env.data.pages.installed ?? 0, CARDS_PER_PAGE)
@@ -113,16 +143,26 @@ export function installed(env: Env): JSX.Element {
     <Box {...column(env)}>
       {note(env, status, 'skills')}
       {status.data !== null &&
-        chips(
+        filterArea(
           env,
-          FILTER_CHIPS.map(chip => ({
-            key: chip.value,
-            label: chip.label,
-            isActive: chip.value === filter,
-            act: { key: `installed-filter:${chip.value}`, command: { kind: 'state', value: chip.value } },
-          })),
-          tagAside(env, { list: 'installed', present: tagCounts(everything), current: tag }),
+          chips(
+            env,
+            FILTER_CHIPS.map(chip => ({
+              key: chip.value,
+              label: chip.label,
+              isActive: chip.value === filter,
+              act: { key: `installed-filter:${chip.value}`, command: { kind: 'state', value: chip.value } },
+            })),
+            tagAside(env, { list: 'installed', present: tagCounts(everything), current: tag }),
+          ),
         )}
+      {status.data !== null && chosen.length > 0 &&
+        selectionBar(env, {
+          list: 'installed',
+          count: chosen.length,
+          shownIds: shown.map(idOf),
+          verbs: barVerbs(chosen),
+        })}
       {status.data !== null && everything.length === 0 &&
         empty(env, 'Nothing is installed yet.', actButton(env, { key: 'installed-open-install', command: { kind: 'view', view: 'install' } }, 'Open Install'))}
       {everything.length > 0 && shown.length === 0 && isTagEmpty && tagEmpty(env, 'installed', tag)}
@@ -130,10 +170,11 @@ export function installed(env: Env): JSX.Element {
         empty(env, 'No skill matches this filter.', actButton(env, { key: 'installed-show-all', command: { kind: 'state', value: 'all' } }, 'Show all'))}
       {paged.items.flatMap(row => [
         installedCard(env, row),
+        confirmAfter(env, cardAnchor(`card:${idOf(row)}`)),
         detail?.kind === 'files' && detail.id === idOf(row) ? filesCard(env, detail.id, detail.text) : null,
       ])}
       {pager(env, 'installed', paged, shown.length, CARDS_PER_PAGE)}
-      <Box>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>
+      <Box {...above(env)}>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>
     </Box>
   )
 }

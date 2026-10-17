@@ -1,7 +1,7 @@
 // Doctor: the installer's checks as coloured rows, and the tools found on this machine.
 import type { AiSuiteCaps, AiSuiteCheckState, AiSuiteDoctor } from '../types'
 import { pageOf, plural } from './summary'
-import { actButton, actionRow, card, column, entry, fit, heading, hue, line, toneProps } from './ui'
+import { actButton, card, column, entry, fit, heading, hue, line, toneProps, viewRow } from './ui'
 import type { Env, Tone } from './ui'
 import { empty, note, pager } from './ui_parts'
 
@@ -38,7 +38,7 @@ function checksCard(env: Env, found: AiSuiteDoctor): JSX.Element {
         )
       }),
     ),
-    pager(env, 'doctor', paged, found.checks.length, CHECKS_PER_PAGE),
+    pager(env, 'doctor', paged, found.checks.length, CHECKS_PER_PAGE, {}),
   )
 }
 
@@ -76,7 +76,7 @@ export function doctor(env: Env): JSX.Element {
       {snap.data !== null && snap.data.checks.length > 0 && checksCard(env, snap.data)}
       {caps.data === null && caps.error !== null && <Box>{note(env, caps, 'tools')}</Box>}
       {caps.data !== null && caps.data.tools.length > 0 && toolsCard(env, caps.data)}
-      {snap.data !== null && actionRow(env, actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Run checks again'))}
+      {snap.data !== null && viewRow(env, actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Run checks again'))}
     </Box>
   )
 }

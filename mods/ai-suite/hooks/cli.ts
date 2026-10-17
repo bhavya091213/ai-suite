@@ -33,6 +33,22 @@ export function truncate(text: string, max: number): string {
   return flat.length <= max ? flat : `${flat.slice(0, Math.max(1, max - 1))}…`
 }
 
+/**
+ * A last-action message cut to `max` cells without a dangling separator: its ` · ` parts are kept
+ * while they fit whole, and the first one is cut (ending in `…`) only when it alone is too long.
+ */
+export function trimMessage(text: string, max: number): string {
+  const parts = text.replace(/\s+/g, ' ').trim().split(' · ')
+  const first = parts[0] ?? ''
+  if (first.length > max) return `${first.slice(0, Math.max(1, max - 1)).trimEnd()}…`
+  let out = first
+  for (const part of parts.slice(1)) {
+    if (out.length + 3 + part.length > max) break
+    out = `${out} · ${part}`
+  }
+  return out
+}
+
 function lines(text: string): string[] {
   return text.split('\n').map(line => line.trim()).filter(line => line !== '')
 }

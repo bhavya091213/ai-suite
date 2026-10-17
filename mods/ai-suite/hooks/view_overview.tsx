@@ -1,10 +1,13 @@
 // Overview: one card per scope with a bar, what needs attention, and the primary actions.
+import { rowAnchor } from './commands'
 import type { Act } from './commands'
-import { actButton, actionRow, card, column, entry, heading, line } from './ui'
+import { actButton, card, column, entry, heading, line, viewRow } from './ui'
 import type { Env, Tone } from './ui'
-import { counts, empty, listRow, note, progress } from './ui_parts'
+import { confirmAfter, counts, empty, listRow, note, progress } from './ui_parts'
 import { countByScope, missingRows, plural, skillCounts } from './summary'
 import type { ScopeCount } from './summary'
+
+const ACTIONS = 'overview-actions'
 
 const SCOPES: readonly { id: string; title: string }[] = [
   { id: 'shared', title: 'Shared' },
@@ -118,7 +121,7 @@ export function overview(env: Env): JSX.Element {
       {rows !== null && SCOPES.map(scope => scopeCard(env, scope, found.find(count => count.scope === scope.id)))}
       {rows !== null && attentionCard(env)}
       {rows === null && status.error === null && empty(env, 'Reading the skills…')}
-      {actionRow(
+      {viewRow(
         env,
         missing > 0 &&
           actButton(
@@ -127,6 +130,7 @@ export function overview(env: Env): JSX.Element {
               key: 'overview-install',
               command: { kind: 'install-all', scope: 'all', query: '', tag: 'all' },
               confirm: true,
+              anchor: rowAnchor(ACTIONS),
             },
             `Install ${missing} missing`,
             { primary: true },
@@ -137,6 +141,7 @@ export function overview(env: Env): JSX.Element {
           actButton(env, { key: 'overview-setup', command: { kind: 'view', view: 'settings' } }, 'Set up this machine'),
         actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh'),
       )}
+      {confirmAfter(env, rowAnchor(ACTIONS))}
     </Box>
   )
 }

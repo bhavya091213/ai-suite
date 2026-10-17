@@ -211,10 +211,19 @@ the description on its own line, and only the buttons that apply to it.
 
 ### Nothing risky runs on one press
 
-**Retire**, **Pull**, **Apply**, **Install all** and **Update all changed** first show a
-confirmation card at the top of the view: the question, one sentence on what happens (and where
-the backup goes), then `[y] Yes, …` and `[n] Cancel`. Nothing else is pressed while the card is
-up. Nothing runs on a timer,
+**Retire**, **Pull**, **Apply**, **Install all**, **Update all changed** and every bulk action
+first show a confirmation card directly under the card or button you pressed: the question, one
+sentence on what happens (and where the backup goes), then `Yes, …` and `Cancel` (`y` / `n` in
+the terminal). Nothing else is pressed while the card is up.
+
+### Select several
+
+Every card in Install and Installed starts with a checkbox (`☐` / `☑`). Tick two or more and a
+bar appears above the list with the count and the actions that apply to the selection:
+**Install N**, **Update N** (modified ones), **Relink N** (link problems), **Retire N…** (one
+confirmation listing the names), plus **Select all shown** for everything that matches the
+current filters across pages, and **Clear**. Bulk actions run one installer call per scope and
+stop at the first failure, reporting how many went through. Nothing runs on a timer,
 one command runs at a time, and a failure (non-zero exit, unexpected output, a folder that is not
 the repo) shows in the message row and as a toast instead of being thrown.
 

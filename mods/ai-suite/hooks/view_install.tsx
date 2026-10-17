@@ -1,10 +1,15 @@
-// Install: filter chips and a name filter over the skills the repo offers that are not installed yet.
+// Install: filter chips and a name filter over the skills the repo offers that are not installed
+// yet, a tick box on every card and, once some are ticked, a bar to install them together.
 import type { AiSuiteScopeFilter } from '../types'
+import { idOf, rowAnchor } from './commands'
 import { ALL_TAGS } from './presets'
+import { chosenRows } from './selection'
 import { CARDS_PER_PAGE, filterMissing, missingRows, pageOf, tagCounts } from './summary'
-import { STATE_BADGES, actButton, below, buttonRow, card, chips, column, fit, heading, skillCard } from './ui'
+import { above, actButton, buttonRow, card, chips, column, filterArea, fit, heading, below } from './ui'
 import type { Env } from './ui'
-import { empty, note, pager, tagAside, tagEmpty } from './ui_parts'
+import { empty, confirmAfter, note, pager, tagAside, tagEmpty } from './ui_parts'
+import { selectionBar } from './ui_select'
+import { STATE_BADGES, skillCard } from './ui_skill'
 
 const SCOPE_CHIPS: readonly { value: AiSuiteScopeFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -12,6 +17,8 @@ const SCOPE_CHIPS: readonly { value: AiSuiteScopeFilter; label: string }[] = [
   { value: 'claude', label: 'Claude' },
   { value: 'codex', label: 'Codex' },
 ]
+
+const FOOTER = 'install-footer'
 
 const refresh = (env: Env): JSX.Element =>
   actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')
@@ -23,6 +30,7 @@ export function install(env: Env): JSX.Element {
   const rows = status.data ?? []
   const missing = missingRows(rows)
   const shown = filterMissing(rows, env.data.filters)
+  const chosen = chosenRows(missing, env.data.installSelection)
   // the tag is what hides everything when lifting it would show something
   const isTagEmpty =
     installTag !== ALL_TAGS && filterMissing(rows, { ...env.data.filters, installTag: ALL_TAGS }).length > 0
@@ -33,56 +41,69 @@ export function install(env: Env): JSX.Element {
     <Box {...column(env)}>
       {note(env, status, 'skills')}
       {status.data !== null &&
-        chips(
+        filterArea(
           env,
-          SCOPE_CHIPS.map(chip => ({
-            key: chip.value,
-            label: chip.label,
-            isActive: chip.value === installScope,
-            act: { key: `install-scope:${chip.value}`, command: { kind: 'scope', value: chip.value } },
-          })),
-          tagAside(env, { list: 'install', present: tagCounts(missing), current: installTag }),
+          chips(
+            env,
+            SCOPE_CHIPS.map(chip => ({
+              key: chip.value,
+              label: chip.label,
+              isActive: chip.value === installScope,
+              act: { key: `install-scope:${chip.value}`, command: { kind: 'scope', value: chip.value } },
+            })),
+            tagAside(env, { list: 'install', present: tagCounts(missing), current: installTag }),
+          ),
+          <Box key="install-filter" {...below(env)}>
+            <Input
+              key="install-query"
+              label="Filter"
+              placeholder="Filter by name…"
+              value={installQuery}
+              submitLabel="filter"
+              onInput={search}
+              onSubmit={search}
+            />
+          </Box>,
         )}
-      {status.data !== null && (
-        <Box {...below(env)}>
-          <Input
-            key="install-query"
-            label="Filter"
-            placeholder="Filter by name…"
-            value={installQuery}
-            submitLabel="filter"
-            onInput={search}
-            onSubmit={search}
-          />
-        </Box>
-      )}
+      {status.data !== null && chosen.length > 0 &&
+        selectionBar(env, {
+          list: 'install',
+          count: chosen.length,
+          shownIds: shown.map(idOf),
+          verbs: [{ verb: 'install', ids: chosen.map(idOf), label: `Install ${chosen.length}`, isPrimary: true }],
+        })}
       {status.data !== null && missing.length === 0 &&
         empty(env, 'Everything is installed.', actButton(env, { key: 'install-check', command: { kind: 'fetch' } }, 'Check updates'))}
       {missing.length > 0 && shown.length === 0 && isTagEmpty && tagEmpty(env, 'install', installTag)}
       {missing.length > 0 && shown.length === 0 && !isTagEmpty &&
         empty(env, 'No missing skill matches this filter.', actButton(env, { key: 'install-show-all', command: { kind: 'scope', value: 'all' } }, 'Show all'))}
-      {paged.items.map(row =>
-        skillCard(env, {
+      {paged.items.map(row => {
+        const id = idOf(row)
+        return skillCard(env, {
           scope: row.scope,
           name: row.name,
           tags: row.tags,
           badges: [STATE_BADGES['not-installed'] ?? { glyph: '·', word: 'missing', tone: 'dim' }],
           summary: { text: row.description === '' ? '(no description)' : row.description, tone: 'dim' },
+          tick: {
+            isOn: env.data.installSelection.includes(id),
+            act: { key: `select:${id}`, command: { kind: 'select', list: 'install', id } },
+          },
           buttons: [
             actButton(
               env,
-              { key: `install:${row.scope}/${row.name}`, command: { kind: 'install', row } },
+              { key: `install:${id}`, command: { kind: 'install', row } },
               fit(env, `Install ${row.name}`, 24),
               { lead: true },
             ),
           ],
-        }),
-      )}
+        })
+      })}
       {pager(env, 'install', paged, shown.length, CARDS_PER_PAGE)}
       {shown.length > 0 &&
         card(
           env,
-          'install-footer',
+          FOOTER,
           null,
           heading(env, 'Install everything shown', String(shown.length)),
           buttonRow(
@@ -93,14 +114,16 @@ export function install(env: Env): JSX.Element {
                 key: 'install-all',
                 command: { kind: 'install-all', scope: installScope, query: installQuery, tag: installTag },
                 confirm: true,
+                anchor: rowAnchor(FOOTER),
               },
               `Install all ${shown.length}`,
               { primary: true },
             ),
             refresh(env),
           ),
+          confirmAfter(env, rowAnchor(FOOTER)),
         )}
-      {shown.length === 0 && <Box>{refresh(env)}</Box>}
+      {shown.length === 0 && <Box {...above(env)}>{refresh(env)}</Box>}
     </Box>
   )
 }

@@ -1,9 +1,12 @@
 // Workflows: the phased workflow skills installed on this machine, with a SKILL.md preview.
 import type { AiSuiteWorkflow } from '../types'
+import { cardAnchor } from './commands'
 import { CARDS_PER_PAGE, pageOf, plural } from './summary'
-import { actButton, badge, buttonRow, card, column, entry, fit, heading, linesOf, line, titleRow } from './ui'
-import type { Badge, Env } from './ui'
-import { empty, note, pager } from './ui_parts'
+import { above, actButton, buttonRow, card, column, entry, fit, heading, linesOf, line, titleRow } from './ui'
+import type { Env } from './ui'
+import { badge } from './ui_skill'
+import type { Badge } from './ui_skill'
+import { confirmAfter, empty, note, pager } from './ui_parts'
 
 const PREVIEW_LINES = 12
 
@@ -20,7 +23,7 @@ function previewCard(env: Env, name: string, text: string): JSX.Element {
     null,
     heading(env, 'SKILL.md', name),
     entry(env, ...paged.items.map(each => <Text wrap="truncate">{each === '' ? ' ' : each}</Text>)),
-    pager(env, 'preview', paged, all.length, PREVIEW_LINES),
+    pager(env, 'preview', paged, all.length, PREVIEW_LINES, {}),
     buttonRow(env, actButton(env, { key: 'close-preview', command: { kind: 'close-detail' } }, 'Close preview')),
   )
 }
@@ -42,8 +45,8 @@ function workflowCard(env: Env, flow: AiSuiteWorkflow): JSX.Element {
     buttonRow(
       env,
       actButton(env, { key: `preview:${flow.name}`, command: { kind: 'preview', name: flow.name } }, isPreviewing ? 'Hide preview' : 'Preview SKILL.md'),
-      actButton(env, { key: `workflow-retire:${flow.name}`, command: { kind: 'workflow-retire', name: flow.name }, confirm: true }, 'Retire…'),
-      actButton(env, { key: `workflow-push:${flow.name}`, command: { kind: 'workflow-push', name: flow.name }, confirm: true }, 'Push to repo…'),
+      actButton(env, { key: `workflow-retire:${flow.name}`, command: { kind: 'workflow-retire', name: flow.name }, confirm: true, anchor: cardAnchor(`workflow:${flow.name}`) }, 'Retire…'),
+      actButton(env, { key: `workflow-push:${flow.name}`, command: { kind: 'workflow-push', name: flow.name }, confirm: true, anchor: cardAnchor(`workflow:${flow.name}`) }, 'Push to repo…'),
     ),
   )
 }
@@ -61,11 +64,14 @@ export function workflows(env: Env): JSX.Element {
         empty(env, 'No workflows are installed yet.', actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh'))}
       {paged.items.flatMap(flow => [
         workflowCard(env, flow),
+        confirmAfter(env, cardAnchor(`workflow:${flow.name}`)),
         detail?.kind === 'preview' && detail.id === flow.name ? previewCard(env, flow.name, detail.text) : null,
       ])}
       {pager(env, 'workflows', paged, flows.length, CARDS_PER_PAGE)}
       <Text dimColor wrap="truncate">{fit(env, 'Create or edit workflows with ./install.sh (tab 0)')}</Text>
-      {flows.length > 0 && <Box>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>}
+      {flows.length > 0 && (
+        <Box {...above(env)}>{actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}</Box>
+      )}
     </Box>
   )
 }

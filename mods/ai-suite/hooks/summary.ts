@@ -215,7 +215,7 @@ export function filterMissing(
   )
 }
 
-const ON_DISK = ['installed', 'modified', 'foreign', 'ignored']
+export const ON_DISK = ['installed', 'modified', 'foreign', 'ignored']
 
 /** What the Installed view lists for a filter chip and a tag (`all` by default); `ignored` rows are the tool-managed ones. */
 export function filterInstalled(

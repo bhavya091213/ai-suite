@@ -308,3 +308,66 @@ export async function buttonKeys(ui: Drawn): Promise<string[]> {
 export async function allText(ui: Drawn): Promise<string[]> {
   return (await ui.findAll({ type: 'Text' })).map(item => item.text)
 }
+
+// ---------------------------------------------------------------- the drawn tree
+
+/** What a mounted drawing hands back whole: an element as the tests read it (its `key` is in `props`). */
+type Tree = { type?: string; props?: Record<string, unknown>; children?: unknown }
+export type Whole = { drawn: () => Promise<unknown> }
+
+const treeKey = (node: Tree): string => (typeof node.props?.key === 'string' ? node.props.key : '')
+
+/** The elements among `value` (a child, a list of them, nested lists), strings and gaps left out. */
+function elementsOf(value: unknown): Tree[] {
+  if (Array.isArray(value)) return value.flatMap(elementsOf)
+  return typeof value === 'object' && value !== null ? [value as Tree] : []
+}
+
+const childrenOf = (node: Tree): Tree[] => elementsOf(node.children ?? node.props?.children)
+
+function walk(node: Tree, visit: (node: Tree) => void): void {
+  visit(node)
+  for (const child of childrenOf(node)) walk(child, visit)
+}
+
+/** The keys of every keyed Box and Button of the drawing, in document order. */
+export async function keyedOrder(ui: Whole): Promise<string[]> {
+  const keys: string[] = []
+  walk((await ui.drawn()) as Tree, node => {
+    const key = treeKey(node)
+    if (key !== '' && (node.type === 'Box' || node.type === 'Button')) keys.push(key)
+  })
+  return keys
+}
+
+/** The keys of the children of the element that holds the keyed `key`, itself among them (an unkeyed child is ''). */
+export async function siblingKeys(ui: Whole, key: string): Promise<string[]> {
+  let found: string[] = []
+  walk((await ui.drawn()) as Tree, node => {
+    const keys = childrenOf(node).map(treeKey)
+    if (keys.includes(key)) found = keys
+  })
+  return found
+}
+
+/** Every string the element `key` shows, anywhere below it. */
+export async function textsUnder(ui: Whole, key: string): Promise<string[]> {
+  const texts: string[] = []
+  const collect = (value: unknown): void => {
+    if (typeof value === 'string') texts.push(value)
+    else if (Array.isArray(value)) value.forEach(collect)
+    else if (typeof value === 'object' && value !== null) {
+      const node = value as Tree
+      collect(node.children ?? node.props?.children)
+    }
+  }
+  walk((await ui.drawn()) as Tree, node => {
+    if (treeKey(node) === key) collect(node.children ?? node.props?.children)
+  })
+  return texts
+}
+
+/** The props of the element `key`, when drawn. */
+export async function propsOf(ui: Drawn, key: string): Promise<Record<string, unknown> | undefined> {
+  return (await ui.find({ key }))?.props
+}

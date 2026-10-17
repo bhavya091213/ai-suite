@@ -1,16 +1,18 @@
-// The Skills pane: the header, then the confirm card or the error callout if there is one, then
-// one of seven views. The drawing is a pure function of PaneData; a control's press is handed to
-// `dispatch`, which the hook binds to its own `$`. The terminal gets a tight grid with hotkeys; the
+// The Skills pane: the header (with the last action's one dim line under the status strip), then
+// the error callout if there is one, then one of seven views, which draw a pending confirm card
+// right where the press that asked for it was. The drawing is a pure function of PaneData; a
+// control's press is handed to `dispatch`, which the hook binds to its own `$`. The terminal gets a tight grid with hotkeys; the
 // desktop app and the editor get a padded page, a tab row without key caps and an Svg bar.
 import type { BoxProps } from 'claude-code'
 import type { AiSuiteView } from '../types'
-import { truncate } from './cli'
+import { trimMessage, truncate } from './cli'
+import { TOP } from './commands'
 import { VIEWS } from './state'
 import type { PaneData } from './state'
 import { plural, skillCounts } from './summary'
-import { actButton, below, column, fit, hue, makeEnv, toneProps } from './ui'
+import { actButton, apart, hue, makeEnv, toneProps } from './ui'
 import type { Dispatch, Els, Env, Look, PaneEls, Tone } from './ui'
-import { callout, confirmCard } from './ui_parts'
+import { callout, confirmAfter } from './ui_parts'
 import { doctor } from './view_doctor'
 import { install } from './view_install'
 import { installed } from './view_installed'
@@ -102,7 +104,19 @@ function statusStrip(env: Env): JSX.Element {
   )
 }
 
-/** Title and repo line, the tab row (terminal hotkeys `o i s u t w d`) and the status strip. */
+/** Cells the desktop page's own padding takes from the pane's width (two on each side). */
+const ROOT_PADDING = 4
+
+/** The last result that is not a failure: one dim line, the whole sentence unless the pane is too narrow for it. */
+function lastAction(env: Env): JSX.Element | null {
+  const { message } = env.data
+  if (message === null || message.kind === 'error') return null
+  const { Text } = env.els
+  const room = Math.max(8, env.columns - (env.isDesktop ? ROOT_PADDING : 0))
+  return <Text key="last-action" dimColor wrap="truncate">{trimMessage(message.text, room)}</Text>
+}
+
+/** Title and repo line, the tab row (terminal hotkeys `o i s u t w d`), the status strip and the last action's line. */
 export function header(env: Env): JSX.Element {
   const { Box, Text } = env.els
   const title = env.isDesktop ? 'Skills' : 'AI Suite · Skills'
@@ -115,30 +129,27 @@ export function header(env: Env): JSX.Element {
         <Text {...toneProps(right.tone)} wrap="truncate">{truncate(right.text, Math.max(8, env.columns - title.length - 2))}</Text>
       </Box>
       {tabs(env)}
-      {statusStrip(env)}
+      <Box key="strip" flexDirection="column">
+        {statusStrip(env)}
+        {lastAction(env)}
+      </Box>
     </Box>
   )
 }
 
 // ---------------------------------------------------------------------- body
 
-/** The last result: a green or dim line for a success, the red callout for a failure. */
-function feedback(env: Env): JSX.Element | null {
+/** A failure, or a repo that cannot be found: the red callouts, below the header and before the filters. */
+function errors(env: Env): JSX.Element | null {
   const { message, repo } = env.data
-  const { Box, Text } = env.els
+  const failure = message?.kind === 'error' ? message.text : ''
   const repoError = repo !== null && repo.error !== '' && message?.text !== repo.error ? repo.error : ''
-  if (message === null && repoError === '') return null
+  if (failure === '' && repoError === '') return null
+  const { Box } = env.els
   return (
-    <Box key="feedback" {...column(env)}>
-      {message?.kind === 'error' && callout(env, 'Something went wrong', message.text)}
+    <Box key="errors" flexDirection="column" {...apart(env)}>
+      {failure !== '' && callout(env, 'Something went wrong', failure)}
       {repoError !== '' && callout(env, 'Could not find the repo', repoError)}
-      {message !== null && message.kind !== 'error' && (
-        <Box {...below(env)}>
-          <Text {...(message.kind === 'ok' ? { color: 'success' } : { dimColor: true })} wrap="truncate">
-            {fit(env, message.text)}
-          </Text>
-        </Box>
-      )}
     </Box>
   )
 }
@@ -159,8 +170,8 @@ export function renderPane(
   return (
     <Box flexDirection="column" {...root(env)}>
       {header(env)}
-      {confirmCard(env)}
-      {feedback(env)}
+      {errors(env)}
+      {confirmAfter(env, TOP)}
       {BODIES[data.view](env)}
     </Box>
   )

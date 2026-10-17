@@ -7,6 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 import type {
   AiSuiteBusy,
+  AiSuiteConfirm,
   AiSuiteDetail,
   AiSuiteFilters,
   AiSuiteMessage,
@@ -17,6 +18,8 @@ import type {
   AiSuiteUpdates,
   AiSuiteView,
 } from '../types'
+import type { SelectList } from './commands'
+import { keepKnown, merged, toggled, without } from './selection'
 
 export const PANE_ID = 'ai-suite'
 
@@ -66,6 +69,8 @@ const pendingAtom = atom({ plugin: 'ai-suite', key: 'pendingConfirm' } as const,
 const messageAtom = atom({ plugin: 'ai-suite', key: 'message' } as const, null)
 const customKeyAtom = atom({ plugin: 'ai-suite', key: 'customKey' } as const, null)
 const detailAtom = atom({ plugin: 'ai-suite', key: 'detail' } as const, null)
+const installSelectionAtom = atom({ plugin: 'ai-suite', key: 'installSelection' } as const, [])
+const installedSelectionAtom = atom({ plugin: 'ai-suite', key: 'installedSelection' } as const, [])
 const bandHiddenAtom = atom({ plugin: 'ai-suite', key: 'bandHidden' } as const, false)
 const paneWaitingAtom = atom({ plugin: 'ai-suite', key: 'paneWaiting' } as const, false)
 
@@ -125,16 +130,16 @@ export async function setBusy($: EngineInterface, busy: AiSuiteBusy | null): Pro
   await update($, busyAtom, () => busy)
 }
 
-export function getPending($: EngineInterface): Promise<string | null> {
+export function getPending($: EngineInterface): Promise<AiSuiteConfirm | null> {
   return read($, pendingAtom)
 }
-export async function setPending($: EngineInterface, key: string | null): Promise<void> {
-  await update($, pendingAtom, () => key)
+export async function setPending($: EngineInterface, confirm: AiSuiteConfirm | null): Promise<void> {
+  await update($, pendingAtom, () => confirm)
 }
 
 /** Takes the confirm that is up down and returns what it held, in a single read-and-write. */
-export async function takePending($: EngineInterface): Promise<string | null> {
-  let taken: string | null = null
+export async function takePending($: EngineInterface): Promise<AiSuiteConfirm | null> {
+  let taken: AiSuiteConfirm | null = null
   await update($, pendingAtom, previous => {
     taken = previous
     return null
@@ -154,6 +159,40 @@ export function getDetail($: EngineInterface): Promise<AiSuiteDetail | null> {
 }
 export async function setDetail($: EngineInterface, detail: AiSuiteDetail | null): Promise<void> {
   await update($, detailAtom, () => detail)
+}
+
+// ---------------------------------------------------------------- selections
+
+/** Changes one list's ticked keys; the other list keeps its own. */
+async function patchSelection(
+  $: EngineInterface,
+  list: SelectList,
+  change: (keys: readonly string[]) => string[],
+): Promise<void> {
+  if (list === 'install') await update($, installSelectionAtom, keys => change(keys))
+  else await update($, installedSelectionAtom, keys => change(keys))
+}
+
+export async function toggleSelected($: EngineInterface, list: SelectList, key: string): Promise<void> {
+  await patchSelection($, list, keys => toggled(keys, key))
+}
+
+export async function addSelected($: EngineInterface, list: SelectList, keys: readonly string[]): Promise<void> {
+  await patchSelection($, list, previous => merged(previous, keys))
+}
+
+export async function dropSelected($: EngineInterface, list: SelectList, keys: readonly string[]): Promise<void> {
+  await patchSelection($, list, previous => without(previous, keys))
+}
+
+export async function clearSelected($: EngineInterface, list: SelectList): Promise<void> {
+  await patchSelection($, list, () => [])
+}
+
+/** After a rescan: forgets the ticked keys that no longer name a skill the list can tick. */
+export async function pruneSelections($: EngineInterface, rows: readonly AiSuiteSkillRow[]): Promise<void> {
+  await patchSelection($, 'install', keys => keepKnown(keys, rows, 'install'))
+  await patchSelection($, 'installed', keys => keepKnown(keys, rows, 'installed'))
 }
 
 export async function setMessage(
@@ -184,17 +223,19 @@ export type PaneData = {
   view: AiSuiteView
   pages: Record<string, number>
   filters: AiSuiteFilters
-  pending: string | null
+  pending: AiSuiteConfirm | null
   busy: AiSuiteBusy | null
   message: AiSuiteMessage | null
   customKey: string | null
   detail: AiSuiteDetail | null
+  installSelection: string[]
+  installedSelection: string[]
   repo: AiSuiteRepo | null
   snapshots: AiSuiteSnapshots
 }
 
 export async function readPane($: EngineInterface): Promise<PaneData> {
-  const [view, pages, filters, pending, busy, message, customKey, detail, repo, snapshots] =
+  const [view, pages, filters, pending, busy, message, customKey, detail, installSelection, installedSelection, repo, snapshots] =
     await Promise.all([
       read($, viewAtom),
       read($, pagesAtom),
@@ -204,10 +245,25 @@ export async function readPane($: EngineInterface): Promise<PaneData> {
       read($, messageAtom),
       read($, customKeyAtom),
       read($, detailAtom),
+      read($, installSelectionAtom),
+      read($, installedSelectionAtom),
       read($, repoAtom),
       read($, snapshotsAtom),
     ])
-  return { view, pages, filters, pending, busy, message, customKey, detail, repo, snapshots }
+  return {
+    view,
+    pages,
+    filters,
+    pending,
+    busy,
+    message,
+    customKey,
+    detail,
+    installSelection,
+    installedSelection,
+    repo,
+    snapshots,
+  }
 }
 
 /** What the band above the prompt draws from, read in one go (and so subscribing the drawing). */

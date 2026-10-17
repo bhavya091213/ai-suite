@@ -1,17 +1,17 @@
 // The rest of the shared pieces: empty states and notes, the error callout, the pager, the confirm
 // card, the progress bar with its numbers, list rows and the two-column settings rows. Like ui.tsx
 // they branch on the surface themselves (`env.isDesktop`) so that no view has to.
-import type { SelectProps } from 'claude-code'
-import type { AiSuiteSnapshot } from '../types'
+import type { BoxProps, SelectProps } from 'claude-code'
+import type { AiSuiteAnchor, AiSuiteSnapshot } from '../types'
 import { truncate } from './cli'
-import { confirmOf, decodeConfirm } from './commands'
+import { confirmOf, decodeConfirm, sameAnchor } from './commands'
 import type { Act, TagList } from './commands'
 import { ALL_TAGS, tagOptions } from './presets'
 import type { TagCount } from './presets'
 import type { Page } from './summary'
 import { barSegments, scopeParts } from './summary'
 import type { BarSegments, CountPart, ScopeCount } from './summary'
-import { actButton, buttonRow, below, card, fit, hue, toneProps, wrapText } from './ui'
+import { above, actButton, buttonRow, below, card, fit, hue, toneProps, wrapText } from './ui'
 import type { Aside, Child, Env, Tone } from './ui'
 
 // -------------------------------------------------------------- empties, notes
@@ -30,8 +30,8 @@ export function empty(env: Env, text: string, answer?: JSX.Element, answerWidth 
 // ------------------------------------------------------------------ tags
 
 const TAG_LABEL = 'Tag'
-/** Cells a Select draws around its label and value: the space after the label and the ends of the picker. */
-const SELECT_TRIM = 7
+/** Cells a Select draws around its label and value: the space after the label and the ends of the picker (a little more on the desktop's native picker). */
+const selectTrim = (env: Env): number => (env.isDesktop ? 9 : 7)
 
 /** What the tag Select of a list needs: the tags (with counts) the list holds and the one picked. */
 export type TagPick = { list: TagList; present: readonly TagCount[]; current: string }
@@ -54,7 +54,7 @@ export function tagAside(env: Env, pick: TagPick): Aside | undefined {
   return {
     key: `filters:${pick.list}`,
     element: <Select key={key} label={TAG_LABEL} options={options} value={pick.current} onSelect={onSelect} />,
-    width: TAG_LABEL.length + widest + SELECT_TRIM,
+    width: TAG_LABEL.length + widest + selectTrim(env),
   }
 }
 
@@ -101,8 +101,18 @@ export const showing = (paged: Page<unknown>, total: number, size: number): stri
 
 const PAGER_SIDE = 14
 
-/** `‹ Prev`, `Showing 1-5 of 26`, `Next ›`; nothing while everything fits one page. */
-export function pager(env: Env, list: string, paged: Page<unknown>, total: number, size: number): JSX.Element | null {
+/**
+ * `‹ Prev`, `Showing 1-5 of 26`, `Next ›`; nothing while everything fits one page. A view's pager
+ * sits a blank row below the list on the desktop; one inside a card passes `{}` for `margin`.
+ */
+export function pager(
+  env: Env,
+  list: string,
+  paged: Page<unknown>,
+  total: number,
+  size: number,
+  margin: Pick<BoxProps, 'marginTop'> = above(env),
+): JSX.Element | null {
   if (paged.pages <= 1) return null
   const { Box, Text } = env.els
   const prev = paged.page > 0 &&
@@ -119,7 +129,7 @@ export function pager(env: Env, list: string, paged: Page<unknown>, total: numbe
     )
   }
   return (
-    <Box key={`pager:${list}`} flexDirection="row" justifyContent="space-between" alignItems="center" width="100%">
+    <Box key={`pager:${list}`} flexDirection="row" justifyContent="space-between" alignItems="center" width="100%" {...margin}>
       <Box width={PAGER_SIDE} justifyContent="flex-start">{prev}</Box>
       <Text dimColor>{showing(paged, total, size)}</Text>
       <Box width={PAGER_SIDE} justifyContent="flex-end">{next}</Box>
@@ -137,7 +147,7 @@ export function confirmCard(env: Env): JSX.Element | null {
   const pending = env.data.pending
   if (pending === null) return null
   const { Box, Text } = env.els
-  const command = decodeConfirm(pending)
+  const command = decodeConfirm(pending.command)
   const keys = env.isDesktop ? {} : { plain: true as const }
   const cancel = actButton(env, { key: 'confirm-no', command: { kind: 'no' } }, 'Cancel', {
     ...keys,
@@ -166,10 +176,20 @@ export function confirmCard(env: Env): JSX.Element | null {
     'warning',
     <Box flexDirection="column">
       <Text bold wrap="truncate">{fit(env, words.question)}</Text>
+      {words.names !== undefined && wrapText(words.names, env.inner, 3).map(each => <Text>{each}</Text>)}
       {wrapText(words.detail, env.inner, 2).map(each => <Text dimColor>{each}</Text>)}
     </Box>,
     row(yes, cancel),
   )
+}
+
+/**
+ * The confirm card, but only where it belongs: a view puts this right after the card, button row
+ * or bar a press named (`anchor`) and it draws nothing unless that press is the pending one.
+ */
+export function confirmAfter(env: Env, anchor: AiSuiteAnchor): JSX.Element | null {
+  const pending = env.data.pending
+  return pending !== null && sameAnchor(pending.anchor, anchor) ? confirmCard(env) : null
 }
 
 // -------------------------------------------------------- progress and numbers
