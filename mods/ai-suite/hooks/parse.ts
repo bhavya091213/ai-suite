@@ -24,6 +24,8 @@ const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
 const texts = (value: unknown): string[] => arr(value).map(str).filter(text => text !== '')
 const records = (value: unknown): Record<string, unknown>[] =>
   arr(value).filter((item): item is Record<string, unknown> => rec(item) !== null)
+/** The use-case tags of a row: trimmed, each once; a missing field or anything but a list of texts is no tag. */
+const tagsOf = (value: unknown): string[] => [...new Set(arr(value).map(item => str(item).trim()).filter(tag => tag !== ''))]
 
 function linksOf(row: Record<string, unknown>): AiSuiteLink[] {
   return records(row.links).map(link => ({ consumer: str(link.consumer), state: str(link.state) }))
@@ -63,6 +65,7 @@ export function parseStatus(raw: unknown): AiSuiteSkillRow[] | null {
       state,
       description: descriptionOf(row),
       category: str(row.category).trim() || OTHER_CATEGORY,
+      tags: tagsOf(row.tags),
       note: hasProblem ? describe(row, bad.length > 0) : '',
       hasSource: rec(row.source) !== null,
       hasProblem,

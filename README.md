@@ -266,8 +266,9 @@ shared skills, 23 are vendored from upstream repositories (provenance pinned in
 [Acknowledgements](#acknowledgements)) and three workflow skills - `skill-forge`,
 `product-design-workflow` and `presentation-workflow` - are authored here. Everything is
 installable one skill at a time from the installer's Skills tab. Every skill also has a category,
-one per section below and kept in `shared/skill-categories.json`, that the installer filters by:
-`./install.sh skills categories` lists them with counts, and `list` / `status` take `--category`.
+one per section below, and one or more tags (use-case filters), both kept in
+`shared/skill-categories.json`: `./install.sh skills categories` lists both with counts, and `list` /
+`status` take `--category` and `--tag`. The 23 tags are design, frontend, backend, api, mobile, data, coding, testing, quality, security, orchestration, workflows, productivity, learning, research, knowledge, writing, presentations, media, business, career, ml, meta.
 
 ### Orchestration, context & harness
 

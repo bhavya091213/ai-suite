@@ -96,16 +96,16 @@ export async function retireOne($: EngineInterface, settings: Settings, row: Nam
   await mutate($, settings, `Retire ${idOf(row)}`, [step(args)], `Retired ${idOf(row)} (moved to a backup).`)
 }
 
-/** Installs every missing skill the Install view's filters name (all of them for scope `all`, category `all` and no query). */
+/** Installs every missing skill the Install view's filters name (all of them for scope `all`, tag `all` and no query). */
 export async function installAll(
   $: EngineInterface,
   settings: Settings,
   scope: AiSuiteScopeFilter,
   query: string,
-  category: string,
+  tag: string,
 ): Promise<void> {
   const { status } = await getSnapshots($)
-  const missing = filterMissing(status.data ?? [], { installScope: scope, installQuery: query, installCategory: category })
+  const missing = filterMissing(status.data ?? [], { installScope: scope, installQuery: query, installTag: tag })
   if (missing.length === 0) {
     await setMessage($, 'info', 'Nothing to install.')
     return

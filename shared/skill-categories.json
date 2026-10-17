@@ -1,5 +1,5 @@
 {
-  "_comment": "Skill name -> category for filtering in the installer and the Claude mod. Keep in sync with the README skill tables; unlisted skills show as 'Other'.",
+  "_comment": "Skill name -> category (README grouping) and tags (use-case filters in the installer and the Claude mod). Keep both in sync when adding a skill; a test fails when a skill is unmapped or uses an unknown tag.",
   "order": [
     "Orchestration",
     "Engineering practice",
@@ -117,5 +117,414 @@
     "verification-loop": "Orchestration",
     "video-editing": "Content & media",
     "x-api": "Web, API & data"
+  },
+  "tags_order": [
+    "design",
+    "frontend",
+    "backend",
+    "api",
+    "mobile",
+    "data",
+    "coding",
+    "testing",
+    "quality",
+    "security",
+    "orchestration",
+    "workflows",
+    "productivity",
+    "learning",
+    "research",
+    "knowledge",
+    "writing",
+    "presentations",
+    "media",
+    "business",
+    "career",
+    "ml",
+    "meta"
+  ],
+  "tags": {
+    "ai-regression-testing": [
+      "testing",
+      "quality"
+    ],
+    "android-clean-architecture": [
+      "mobile",
+      "coding"
+    ],
+    "api-design": [
+      "api",
+      "backend"
+    ],
+    "article-writing": [
+      "writing"
+    ],
+    "ats-optimize": [
+      "career",
+      "writing"
+    ],
+    "backend-patterns": [
+      "backend",
+      "coding"
+    ],
+    "bluf": [
+      "writing"
+    ],
+    "bun-runtime": [
+      "frontend",
+      "coding"
+    ],
+    "claude-api": [
+      "api",
+      "coding"
+    ],
+    "coding-standards": [
+      "coding",
+      "quality"
+    ],
+    "compose-multiplatform-patterns": [
+      "mobile",
+      "frontend"
+    ],
+    "configure-ecc": [
+      "meta",
+      "productivity"
+    ],
+    "content-engine": [
+      "writing",
+      "business"
+    ],
+    "continuous-learning": [
+      "learning",
+      "productivity"
+    ],
+    "continuous-learning-v2": [
+      "learning",
+      "productivity"
+    ],
+    "cpp-coding-standards": [
+      "coding",
+      "quality"
+    ],
+    "cpp-testing": [
+      "testing"
+    ],
+    "crosspost": [
+      "writing",
+      "business"
+    ],
+    "deep-research": [
+      "research"
+    ],
+    "defuddle": [
+      "research",
+      "knowledge"
+    ],
+    "django-patterns": [
+      "backend",
+      "coding"
+    ],
+    "django-tdd": [
+      "testing"
+    ],
+    "django-verification": [
+      "quality",
+      "testing"
+    ],
+    "dmux-workflows": [
+      "orchestration"
+    ],
+    "documentation-lookup": [
+      "research",
+      "coding"
+    ],
+    "e2e-testing": [
+      "testing",
+      "frontend"
+    ],
+    "endpoint-testing": [
+      "testing",
+      "api"
+    ],
+    "eval-harness": [
+      "testing",
+      "quality"
+    ],
+    "exa-search": [
+      "research"
+    ],
+    "exec-summary": [
+      "writing",
+      "business"
+    ],
+    "executive-communication": [
+      "writing",
+      "business"
+    ],
+    "fal-ai-media": [
+      "media"
+    ],
+    "find-skills": [
+      "meta"
+    ],
+    "flow-ai-chat": [
+      "design"
+    ],
+    "flow-app-shell": [
+      "design",
+      "frontend"
+    ],
+    "flow-auth": [
+      "design",
+      "security"
+    ],
+    "flow-checkout": [
+      "design",
+      "business"
+    ],
+    "flow-empty-states": [
+      "design"
+    ],
+    "flow-errors": [
+      "design"
+    ],
+    "flow-forms": [
+      "design"
+    ],
+    "flow-navigation": [
+      "design"
+    ],
+    "flow-onboarding": [
+      "design"
+    ],
+    "flow-paywall": [
+      "design",
+      "business"
+    ],
+    "flow-permissions": [
+      "design",
+      "mobile"
+    ],
+    "flow-search": [
+      "design"
+    ],
+    "flow-settings": [
+      "design"
+    ],
+    "flow-sharing": [
+      "design"
+    ],
+    "flow-tables": [
+      "design",
+      "data"
+    ],
+    "frontend-design": [
+      "design",
+      "frontend"
+    ],
+    "frontend-patterns": [
+      "frontend",
+      "coding"
+    ],
+    "frontend-slides": [
+      "presentations",
+      "design"
+    ],
+    "golang-patterns": [
+      "coding",
+      "backend"
+    ],
+    "golang-testing": [
+      "testing"
+    ],
+    "information-architecture": [
+      "design"
+    ],
+    "investor-materials": [
+      "business",
+      "writing",
+      "presentations"
+    ],
+    "investor-outreach": [
+      "business",
+      "writing"
+    ],
+    "iterative-retrieval": [
+      "orchestration",
+      "knowledge"
+    ],
+    "java-coding-standards": [
+      "coding",
+      "backend"
+    ],
+    "json-canvas": [
+      "knowledge"
+    ],
+    "kotlin-coroutines-flows": [
+      "coding",
+      "mobile"
+    ],
+    "kotlin-exposed-patterns": [
+      "data",
+      "backend"
+    ],
+    "kotlin-ktor-patterns": [
+      "backend",
+      "api"
+    ],
+    "kotlin-patterns": [
+      "coding"
+    ],
+    "kotlin-testing": [
+      "testing"
+    ],
+    "lambda-gpu-training": [
+      "ml",
+      "workflows"
+    ],
+    "laravel-patterns": [
+      "backend",
+      "coding"
+    ],
+    "laravel-tdd": [
+      "testing"
+    ],
+    "laravel-verification": [
+      "quality",
+      "testing"
+    ],
+    "local-knowledge-retrieval": [
+      "knowledge",
+      "orchestration"
+    ],
+    "market-research": [
+      "research",
+      "business"
+    ],
+    "mcp-server-patterns": [
+      "api",
+      "coding"
+    ],
+    "minto-pyramid": [
+      "writing"
+    ],
+    "neon": [
+      "data",
+      "backend"
+    ],
+    "neon-postgres": [
+      "data",
+      "backend"
+    ],
+    "nextjs-turbopack": [
+      "frontend",
+      "coding"
+    ],
+    "obsidian-bases": [
+      "knowledge"
+    ],
+    "obsidian-cli": [
+      "knowledge",
+      "productivity"
+    ],
+    "obsidian-markdown": [
+      "knowledge",
+      "writing"
+    ],
+    "perl-patterns": [
+      "coding"
+    ],
+    "perl-testing": [
+      "testing"
+    ],
+    "plankton-code-quality": [
+      "quality",
+      "coding"
+    ],
+    "presentation-workflow": [
+      "presentations",
+      "workflows",
+      "writing"
+    ],
+    "product-design-workflow": [
+      "design",
+      "workflows"
+    ],
+    "project-guidelines-example": [
+      "meta"
+    ],
+    "python-patterns": [
+      "coding"
+    ],
+    "python-testing": [
+      "testing"
+    ],
+    "remotion-best-practices": [
+      "media",
+      "frontend"
+    ],
+    "rust-patterns": [
+      "coding"
+    ],
+    "rust-testing": [
+      "testing"
+    ],
+    "security-review": [
+      "security",
+      "quality"
+    ],
+    "skill-forge": [
+      "meta",
+      "workflows"
+    ],
+    "skill-stocktake": [
+      "meta",
+      "quality"
+    ],
+    "slide-deck": [
+      "presentations",
+      "writing"
+    ],
+    "springboot-patterns": [
+      "backend",
+      "coding"
+    ],
+    "springboot-tdd": [
+      "testing"
+    ],
+    "springboot-verification": [
+      "quality",
+      "testing"
+    ],
+    "storage-cull": [
+      "productivity",
+      "orchestration"
+    ],
+    "strategic-compact": [
+      "productivity",
+      "orchestration"
+    ],
+    "tdd-workflow": [
+      "testing",
+      "workflows"
+    ],
+    "token-efficient-orchestration": [
+      "orchestration",
+      "productivity"
+    ],
+    "userflow": [
+      "design"
+    ],
+    "verification-loop": [
+      "quality",
+      "testing",
+      "workflows"
+    ],
+    "video-editing": [
+      "media"
+    ],
+    "x-api": [
+      "api"
+    ]
   }
 }

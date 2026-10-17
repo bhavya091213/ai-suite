@@ -33,9 +33,9 @@ export const VIEWS: readonly { id: AiSuiteView; label: string; hotkey: string }[
 export const DEFAULT_FILTERS: AiSuiteFilters = {
   installScope: 'all',
   installQuery: '',
-  installCategory: 'all',
+  installTag: 'all',
   installed: 'all',
-  installedCategory: 'all',
+  installedTag: 'all',
 }
 
 export type SnapshotName = keyof AiSuiteSnapshots

@@ -327,9 +327,9 @@ Exit codes: `0` ok, `1` failure, `2` usage error, `3` file excluded by a require
 
 | Command | What it does | Example |
 | --- | --- | --- |
-| `status [--scope S] [--category C] [--json]` | Table of every skill: state, link state, upstream changes | `./install.sh skills status --scope shared` |
-| `list [--scope S] [--category C] [--json]` | Skills available in the repo with a category and an installed marker | `./install.sh skills list --category "Design & UX"` |
-| `categories [--json]` | Every category with how many skills the repo offers and how many are installed | `./install.sh skills categories` |
+| `status [--scope S] [--category C] [--tag T] [--json]` | Table of every skill: state, link state, upstream changes | `./install.sh skills status --scope shared` |
+| `list [--scope S] [--category C] [--tag T] [--json]` | Skills available in the repo with a category, tags and an installed marker | `./install.sh skills list --category "Design & UX" --tag frontend` |
+| `categories [--json]` | Every category and every tag with how many skills the repo offers and how many are installed | `./install.sh skills categories` |
 | `issues [--json]` | Duplicates, broken links, foreign entries, bad frontmatter | `./install.sh skills issues` |
 | `install NAME... [--scope S] [-y] [--dry-run]` | Install skills; never overwrites | `./install.sh skills install flow-auth flow-forms --dry-run` |
 | `update NAME... [--scope S] [-y] [--dry-run]` | Replace a modified installed skill with the repo copy, backing it up | `./install.sh skills update frontend-design` |
@@ -363,26 +363,43 @@ Exit codes: `0` ok, `1` failure, `2` usage error, `3` file excluded by a require
 `--json` output is meant for scripts; the table output uses plain text and degrades to ASCII
 symbols when the locale is not UTF-8.
 
-### Categories
+### Categories and tags
 
-Every skill belongs to one category, listed in `shared/skill-categories.json` (read from the repo
-and installed nowhere): `{"order": [...], "categories": {"<skill name>": "<category>"}}`. `order` is
-the display order and always ends up containing `Other`, the category of any unmapped name. A
-Claude/Codex variant pair shares one entry. A missing or invalid file is not an error: every skill
-is then `Other`.
+Every skill belongs to one category and carries one or more tags, all listed in
+`shared/skill-categories.json` (read from the repo and installed nowhere):
 
-- `status --json` and `list --json` rows carry a `"category"` string; `list` also prints a CATEGORY
-  column. `status`, `list` and `categories` are the only commands that know about categories;
-  `install` and the other mutating commands still take skill names.
+```json
+{"order": ["..."], "categories": {"<skill name>": "<category>"},
+ "tags_order": ["design", "..."], "tags": {"<skill name>": ["design", "frontend"]}}
+```
+
+A category is the README section a skill sits in; a tag is a use-case filter (`design`,
+`productivity`, `workflows`, `orchestration`, `coding`, ...), so a skill can match several. `order`
+and `tags_order` are the display orders. `order` always ends up containing `Other`, the category of
+any unmapped name; an unmapped skill has no tags. A tag a skill uses but `tags_order` omits is
+appended after the declared ones. A Claude/Codex variant pair shares one entry. A missing or
+invalid file is not an error: every skill is then `Other` and has no tags.
+
+- `status --json` and `list --json` rows carry a `"category"` string and a `"tags"` array (empty
+  for an untagged skill); `list` also prints CATEGORY and TAGS (comma-joined) columns. `status`,
+  `list` and `categories` are the only commands that know about them; `install` and the other
+  mutating commands still take skill names.
 - `--category NAME` keeps only the skills in that category. The match is case-insensitive and exact
   (`--category "design & ux"`); an unknown name exits 2 and lists the valid ones. In `status` the
   summary line counts only the rows that survived the filter.
+- `--tag NAME` keeps only the skills that have that tag among theirs, matched the same way
+  (`--tag Frontend`); an unknown name exits 2 and lists the valid tags. It combines with
+  `--category` and `--scope`: a row must satisfy every filter given.
 - `categories` prints each category in `order` with `OFFERED` (distinct skill names in the repo) and
-  `INSTALLED` (those present on disk, unmodified or modified, in at least one scope). `--json` gives
-  `[{"category", "offered", "installed"}]`.
+  `INSTALLED` (those present on disk, unmodified or modified, in at least one scope), then a second
+  table of the tags in `tags_order` with the same two counts (a skill counts once under each of
+  its tags, so the tag counts add up to more than the number of skills; the table is left out when
+  no tags are defined). `--json` gives
+  `{"categories": [{"category", "offered", "installed"}], "tags": [{"tag", "offered", "installed"}]}`.
 
-A new skill needs an entry in the file; `installer/tests/test_categories.py` fails when a skill
-directory has none, or when an entry names a skill that no longer exists.
+A new skill needs an entry with a category and at least one tag in the file;
+`installer/tests/test_categories.py` fails when a skill directory has either missing, when an entry
+names a skill that no longer exists, or when a tag is not declared in `tags_order`.
 
 ---
 

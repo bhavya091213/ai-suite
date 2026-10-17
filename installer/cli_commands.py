@@ -98,20 +98,26 @@ def _notes_text(row: SkillStatus) -> str:
     return "  ".join(notes)
 
 
-def _category_filter(ctx: Ctx, cats: categories.Categories) -> Optional[str]:
-    """The canonical category named by ``--category`` (case-insensitive), None without the flag."""
-    wanted = ctx.flag("category", None)
+def _choice(ctx: Ctx, flag: str, kind: str, options: Sequence[str]) -> Optional[str]:
+    """The canonical entry of `options` named by ``--<flag>`` (case-insensitive), None without it."""
+    wanted = ctx.flag(flag, None)
     if wanted is None:
         return None
-    for name in cats.order:
-        if name.casefold() == wanted.strip().casefold():
-            return name
-    raise usage_error(f"unknown category: {wanted!r}; choose one of: {', '.join(cats.order)}")
+    found = categories.canonical(options, wanted)
+    if found is None:
+        valid = ", ".join(options) if options else "none are defined"
+        raise usage_error(f"unknown {kind}: {wanted!r}; choose one of: {valid}")
+    return found
 
 
-def _in_category(rows: Sequence[SkillStatus], cats: categories.Categories,
-                 chosen: Optional[str]) -> Tuple[SkillStatus, ...]:
-    return tuple(r for r in rows if chosen is None or categories.category_of(cats, r.name) == chosen)
+def _filtered(ctx: Ctx, rows: Sequence[SkillStatus],
+              cats: categories.Categories) -> Tuple[SkillStatus, ...]:
+    """`rows` narrowed by ``--category`` and ``--tag`` (both when both are given)."""
+    category = _choice(ctx, "category", "category", cats.order)
+    tag = _choice(ctx, "tag", "tag", cats.tags_order)
+    return tuple(r for r in rows
+                 if (category is None or categories.category_of(cats, r.name) == category)
+                 and (tag is None or categories.has_tag(cats, r.name, tag)))
 
 
 def _counts_line(statuses: Sequence[SkillStatus], scope: Optional[str]) -> str:
@@ -128,9 +134,10 @@ def cmd_status(ctx: Ctx) -> int:
     world = load_world(ctx.paths, with_remote=True)
     scope = ctx.flag("scope", None)
     cats = categories.load(ctx.paths)
-    rows = _in_category(_scope_rows(world, scope), cats, _category_filter(ctx, cats))
+    rows = _filtered(ctx, _scope_rows(world, scope), cats)
     if ctx.flag("json"):
-        dump_json([{**to_jsonable(r), "category": categories.category_of(cats, r.name)} for r in rows])
+        dump_json([{**to_jsonable(r), "category": categories.category_of(cats, r.name),
+                    "tags": list(categories.tags_of(cats, r.name))} for r in rows])
         return EXIT_OK
     table = [(glyph(r.state.value), r.scope, r.name, r.state.value, _links_text(r), _notes_text(r))
              for r in rows]
@@ -147,36 +154,48 @@ def _install_label(row: SkillStatus) -> str:
 def cmd_list(ctx: Ctx) -> int:
     world = load_world(ctx.paths, with_remote=True)
     cats = categories.load(ctx.paths)
-    rows = [r for r in _in_category(_scope_rows(world, ctx.flag("scope", None)), cats,
-                                    _category_filter(ctx, cats)) if r.source is not None]
+    rows = [r for r in _filtered(ctx, _scope_rows(world, ctx.flag("scope", None)), cats)
+            if r.source is not None]
     if ctx.flag("json"):
         dump_json([{"scope": r.scope, "name": r.name, "state": r.state, "installed": _install_label(r),
                     "description": r.description, "path": r.source.path if r.source else None,
-                    "category": categories.category_of(cats, r.name)}
+                    "category": categories.category_of(cats, r.name),
+                    "tags": list(categories.tags_of(cats, r.name))}
                    for r in rows])
         return EXIT_OK
     table = [(glyph(r.state.value), r.scope, r.name, categories.category_of(cats, r.name),
-              _install_label(r), truncate(r.description, DESCRIPTION_WIDTH)) for r in rows]
-    print_table(("", "SCOPE", "NAME", "CATEGORY", "INSTALLED", "DESCRIPTION"), table)
+              ", ".join(categories.tags_of(cats, r.name)), _install_label(r),
+              truncate(r.description, DESCRIPTION_WIDTH)) for r in rows]
+    print_table(("", "SCOPE", "NAME", "CATEGORY", "TAGS", "INSTALLED", "DESCRIPTION"), table)
     return EXIT_OK
 
 
+def _offered_and_installed(pairs_offered: Sequence[Tuple[str, int]],
+                           pairs_present: Sequence[Tuple[str, int]]) -> List[Tuple[str, int, int]]:
+    on_disk = dict(pairs_present)
+    return [(label, available, on_disk.get(label, 0)) for label, available in pairs_offered]
+
+
 def cmd_categories(ctx: Ctx) -> int:
-    """Every category with how many distinct skills the repo offers and how many are on disk
-    (installed or modified in at least one scope). ``--json`` prints
-    [{category, offered, installed}] in display order."""
+    """Every category, then every tag, with how many distinct skills the repo offers and how many
+    are on disk (installed or modified in at least one scope). ``--json`` prints
+    {categories: [{category, offered, installed}], tags: [{tag, offered, installed}]}, each in
+    display order."""
     world = load_world(ctx.paths)
     cats = categories.load(ctx.paths)
     offered = sorted({r.name for r in world.statuses if r.source is not None})
     present = sorted({r.name for r in world.statuses
                       if r.source is not None and r.state in (State.INSTALLED, State.MODIFIED)})
-    on_disk = dict(categories.counts(cats, present))
-    rows = [(category, available, on_disk.get(category, 0))
-            for category, available in categories.counts(cats, offered)]
+    by_category = _offered_and_installed(categories.counts(cats, offered), categories.counts(cats, present))
+    by_tag = _offered_and_installed(categories.tag_counts(cats, offered), categories.tag_counts(cats, present))
     if ctx.flag("json"):
-        dump_json([{"category": c, "offered": o, "installed": i} for c, o, i in rows])
+        dump_json({"categories": [{"category": c, "offered": o, "installed": i} for c, o, i in by_category],
+                   "tags": [{"tag": t, "offered": o, "installed": i} for t, o, i in by_tag]})
         return EXIT_OK
-    print_table(("CATEGORY", "OFFERED", "INSTALLED"), [(c, str(o), str(i)) for c, o, i in rows])
+    print_table(("CATEGORY", "OFFERED", "INSTALLED"), [(c, str(o), str(i)) for c, o, i in by_category])
+    if by_tag:
+        emit("")
+        print_table(("TAG", "OFFERED", "INSTALLED"), [(t, str(o), str(i)) for t, o, i in by_tag])
     return EXIT_OK
 
 

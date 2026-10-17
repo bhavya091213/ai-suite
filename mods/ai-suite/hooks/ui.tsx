@@ -300,8 +300,8 @@ export function badge(env: Env, item: Badge): JSX.Element {
 export type SkillCard = {
   scope: string
   name: string
-  /** Drawn dim after the scope (`shared · Design & UX`); left off when unknown or when the card is too narrow for it. */
-  category?: string
+  /** Drawn dim after the scope (`shared · design · frontend`, the first three); left off when there are none or the card is too narrow for them. */
+  tags?: readonly string[]
   badges: readonly Badge[]
   /** The second line: the description, or what is wrong. */
   summary: { text: string; tone: Tone }
@@ -310,23 +310,26 @@ export type SkillCard = {
   buttons: readonly Child[]
 }
 
-/** Room the name keeps on the title line before the category gives way. */
+/** Room the name keeps on the title line before the tags give way. */
 const NAME_ROOM = 12
+/** Tags a card shows; the rest are one pick away in the Select. */
+const CARD_TAGS = 3
 
-/** `· Design & UX`, dim, cut to the room the line has beside the scope, the badges and a short name; null when there is none. */
-function categoryTag(env: Env, spec: SkillCard, taken: number): string | null {
-  if (spec.category === undefined || spec.category === '') return null
+/** `· design · frontend`, dim, cut to the room the line has beside the scope, the badges and a short name; null when there is none. */
+function tagLine(env: Env, spec: SkillCard, taken: number): string | null {
+  const shown = (spec.tags ?? []).slice(0, CARD_TAGS)
+  if (shown.length === 0) return null
   const room = env.inner - taken - Math.min(spec.name.length, NAME_ROOM) - 1
-  return room < 8 ? null : truncate(`· ${spec.category}`, room)
+  return room < 8 ? null : truncate(`· ${shown.join(' · ')}`, room)
 }
 
-/** The skill card of the spec: name, scope, category and state badges; one description line; one button line. */
+/** The skill card of the spec: name, scope, tags and state badges; one description line; one button line. */
 export function skillCard(env: Env, spec: SkillCard): JSX.Element {
   const { Box, Text } = env.els
   const scope = env.isDesktop ? spec.scope : `[${spec.scope}]`
   const taken = scope.length + spec.badges.reduce((sum, item) => sum + badgeWidth(env, item) + 1, 0) + (env.isDesktop ? 4 : 1)
-  const tag = categoryTag(env, spec, taken)
-  const used = taken + (tag === null ? 0 : tag.length + 1)
+  const tagText = tagLine(env, spec, taken)
+  const used = taken + (tagText === null ? 0 : tagText.length + 1)
   const buttons = buttonRow(env, ...spec.buttons)
   return card(
     env,
@@ -339,7 +342,7 @@ export function skillCard(env: Env, spec: SkillCard): JSX.Element {
         [
           <Text bold wrap="truncate">{fit(env, spec.name, used)}</Text>,
           <Text dimColor>{scope}</Text>,
-          tag !== null && <Text dimColor wrap="truncate">{tag}</Text>,
+          tagText !== null && <Text dimColor wrap="truncate">{tagText}</Text>,
         ],
         spec.badges.map(item => badge(env, item)),
       ),

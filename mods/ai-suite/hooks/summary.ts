@@ -9,7 +9,8 @@ import type {
   AiSuiteUpdates,
 } from '../types'
 import { truncate } from './cli'
-import { ALL_CATEGORIES } from './presets'
+import { ALL_TAGS } from './presets'
+import type { TagCount } from './presets'
 
 const SCOPE_ORDER = ['shared', 'claude', 'codex']
 
@@ -188,23 +189,26 @@ export const CARDS_PER_PAGE = 5
 export const missingRows = (rows: readonly AiSuiteSkillRow[]): AiSuiteSkillRow[] =>
   rows.filter(row => row.state === 'not-installed')
 
-/** The categories the rows hold, each once (the Select puts them in order). */
-export const categoriesOf = (rows: readonly AiSuiteSkillRow[]): string[] => [...new Set(rows.map(row => row.category))]
+/** The tags the rows carry with how many rows carry each (the Select puts them in order); a row with no tag adds none. */
+export function tagCounts(rows: readonly AiSuiteSkillRow[]): TagCount[] {
+  const counts = new Map<string, number>()
+  for (const row of rows) for (const tag of row.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  return [...counts.entries()].map(([tag, count]) => ({ tag, count }))
+}
 
-/** True for the `all` pick and for a skill in the picked category. */
-const inCategory = (row: AiSuiteSkillRow, category: string): boolean =>
-  category === ALL_CATEGORIES || row.category === category
+/** True for the `all` pick and for a skill carrying the picked tag; a skill with no tag matches only `all`. */
+const hasTag = (row: AiSuiteSkillRow, tag: string): boolean => tag === ALL_TAGS || row.tags.includes(tag)
 
-/** The missing skills the Install view shows: one scope (or all), one category (or all) and names or descriptions holding the query. */
+/** The missing skills the Install view shows: one scope (or all), one tag (or all) and names or descriptions holding the query. */
 export function filterMissing(
   rows: readonly AiSuiteSkillRow[],
-  filters: Pick<AiSuiteFilters, 'installScope' | 'installQuery' | 'installCategory'>,
+  filters: Pick<AiSuiteFilters, 'installScope' | 'installQuery' | 'installTag'>,
 ): AiSuiteSkillRow[] {
   const query = filters.installQuery.trim().toLowerCase()
   return missingRows(rows).filter(
     row =>
       (filters.installScope === 'all' || row.scope === filters.installScope) &&
-      inCategory(row, filters.installCategory) &&
+      hasTag(row, filters.installTag) &&
       (query === '' ||
         row.name.toLowerCase().includes(query) ||
         row.description.toLowerCase().includes(query)),
@@ -213,13 +217,13 @@ export function filterMissing(
 
 const ON_DISK = ['installed', 'modified', 'foreign', 'ignored']
 
-/** What the Installed view lists for a filter chip and a category (`all` by default); `ignored` rows are the tool-managed ones. */
+/** What the Installed view lists for a filter chip and a tag (`all` by default); `ignored` rows are the tool-managed ones. */
 export function filterInstalled(
   rows: readonly AiSuiteSkillRow[],
   filter: AiSuiteInstalledFilter,
-  category: string = ALL_CATEGORIES,
+  tag: string = ALL_TAGS,
 ): AiSuiteSkillRow[] {
-  const present = rows.filter(row => ON_DISK.includes(row.state) && inCategory(row, category))
+  const present = rows.filter(row => ON_DISK.includes(row.state) && hasTag(row, tag))
   switch (filter) {
     case 'modified':
       return present.filter(row => row.state === 'modified')

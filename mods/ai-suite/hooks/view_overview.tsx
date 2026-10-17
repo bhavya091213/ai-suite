@@ -125,7 +125,7 @@ export function overview(env: Env): JSX.Element {
             env,
             {
               key: 'overview-install',
-              command: { kind: 'install-all', scope: 'all', query: '', category: 'all' },
+              command: { kind: 'install-all', scope: 'all', query: '', tag: 'all' },
               confirm: true,
             },
             `Install ${missing} missing`,

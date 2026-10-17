@@ -1,6 +1,6 @@
 // The Settings view as data: which settings it shows, in which sections, and the
 // preset values each Select offers. Free text is only ever reached through `Custom…`. The
-// skill categories the Install and Installed views filter by live here too.
+// skill tags the Install and Installed views filter by live here too.
 
 /** The option value that reveals a text field. */
 export const CUSTOM = '__custom__'
@@ -146,40 +146,60 @@ export function selectChoice(spec: SettingSpec, current: string, isCustomOpen: b
 /** The text `config set` takes for a picked value (an empty setting is empty text). */
 export const settingText = (value: string): string => (value === NONE ? '' : value)
 
-// ------------------------------------------------------------ skill categories
+// ------------------------------------------------------------ skill tags
 
-/** The category of a skill the installer gives none (and the last in the list). */
+/** The category of a skill the installer gives none. It is kept on every row but no longer drawn or filtered by. */
 export const OTHER_CATEGORY = 'Other'
-/** The category Select's value for every category. */
-export const ALL_CATEGORIES = 'all'
-/** The canonical order of the categories: `order` of shared/skill-categories.json. */
-export const CATEGORY_ORDER: readonly string[] = [
-  'Orchestration',
-  'Engineering practice',
-  'Languages & frameworks',
-  'Web, API & data',
-  'Design & UX',
-  'Research & knowledge',
-  'Content & media',
-  'Presentations',
-  'Business & career',
-  OTHER_CATEGORY,
+/** The tag Select's value for every tag. */
+export const ALL_TAGS = 'all'
+/** The canonical order of the use-case tags the Install and Installed views offer. */
+export const TAG_ORDER: readonly string[] = [
+  'design',
+  'frontend',
+  'backend',
+  'api',
+  'mobile',
+  'data',
+  'coding',
+  'testing',
+  'quality',
+  'security',
+  'orchestration',
+  'workflows',
+  'productivity',
+  'learning',
+  'research',
+  'knowledge',
+  'writing',
+  'presentations',
+  'media',
+  'business',
+  'career',
+  'ml',
+  'meta',
 ]
 
-/** Where a category sorts: canonical order, a name the installer added just before Other, Other last. */
-function categoryRank(category: string): number {
-  if (category === OTHER_CATEGORY) return CATEGORY_ORDER.length
-  const at = CATEGORY_ORDER.indexOf(category)
-  return at >= 0 ? at : CATEGORY_ORDER.length - 1
+/** A tag and how many of a view's rows carry it. */
+export type TagCount = { tag: string; count: number }
+
+/** Where a tag sorts: canonical order, then the names the installer added after it (alphabetically). */
+const tagRank = (tag: string): number => {
+  const at = TAG_ORDER.indexOf(tag)
+  return at >= 0 ? at : TAG_ORDER.length
 }
 
 /**
- * The category Select's options: `All categories`, then the categories `present` in the rows in
- * canonical order. The `current` pick is kept in the list even when no row has it any more, so
- * the Select never holds a value it cannot show.
+ * The tag Select's options: `All tags`, then the tags in `counts` in canonical order with the number of
+ * rows carrying each (`design (20)`), tags the installer added after the known ones. The `current` pick
+ * stays in the list even when no row has it any more (as `design (0)`), so the Select never holds a value
+ * it cannot show. A row with no tag appears under `All tags` only.
  */
-export function categoryOptions(present: readonly string[], current: string): Option[] {
-  const wanted = current === ALL_CATEGORIES ? present : [...present, current]
-  const sorted = [...new Set(wanted)].sort((a, b) => categoryRank(a) - categoryRank(b) || a.localeCompare(b))
-  return [{ value: ALL_CATEGORIES, label: 'All categories' }, ...sorted.map(value => ({ value }))]
+export function tagOptions(counts: readonly TagCount[], current: string): Option[] {
+  const known = new Map(counts.map(each => [each.tag, each.count]))
+  if (current !== ALL_TAGS && !known.has(current)) known.set(current, 0)
+  const sorted = [...known.entries()].sort(([a], [b]) => tagRank(a) - tagRank(b) || a.localeCompare(b))
+  return [
+    { value: ALL_TAGS, label: 'All tags' },
+    ...sorted.map(([tag, count]) => ({ value: tag, label: `${tag} (${count})` })),
+  ]
 }

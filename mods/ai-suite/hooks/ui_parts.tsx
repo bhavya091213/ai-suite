@@ -5,8 +5,9 @@ import type { SelectProps } from 'claude-code'
 import type { AiSuiteSnapshot } from '../types'
 import { truncate } from './cli'
 import { confirmOf, decodeConfirm } from './commands'
-import type { Act, CategoryList } from './commands'
-import { ALL_CATEGORIES, categoryOptions } from './presets'
+import type { Act, TagList } from './commands'
+import { ALL_TAGS, tagOptions } from './presets'
+import type { TagCount } from './presets'
 import type { Page } from './summary'
 import { barSegments, scopeParts } from './summary'
 import type { BarSegments, CountPart, ScopeCount } from './summary'
@@ -26,45 +27,45 @@ export function empty(env: Env, text: string, answer?: JSX.Element, answerWidth 
   )
 }
 
-// ------------------------------------------------------------------ categories
+// ------------------------------------------------------------------ tags
 
-const CATEGORY_LABEL = 'Category'
+const TAG_LABEL = 'Tag'
 /** Cells a Select draws around its label and value: the space after the label and the ends of the picker. */
 const SELECT_TRIM = 7
 
-/** What the category Select of a list needs: the categories the list holds and the one picked. */
-export type CategoryPick = { list: CategoryList; present: readonly string[]; current: string }
+/** What the tag Select of a list needs: the tags (with counts) the list holds and the one picked. */
+export type TagPick = { list: TagList; present: readonly TagCount[]; current: string }
 
 /**
- * The `Category` Select that goes with a view's filter chips (`All categories`, then the ones
- * the rows hold, in canonical order). A pick filters the list and sends its pager back to
- * page 1 (`category` in actions.ts). Nothing is drawn while the rows hold no category.
+ * The `Tag` Select that goes with a view's filter chips (`All tags`, then the ones the rows
+ * carry, in canonical order, each with its count). A pick filters the list and sends its pager
+ * back to page 1 (`tag` in actions.ts). Nothing is drawn while the rows carry no tag.
  */
-export function categoryAside(env: Env, pick: CategoryPick): Aside | undefined {
-  if (pick.present.length === 0 && pick.current === ALL_CATEGORIES) return undefined
+export function tagAside(env: Env, pick: TagPick): Aside | undefined {
+  if (pick.present.length === 0 && pick.current === ALL_TAGS) return undefined
   const { Select } = env.els
-  const options = categoryOptions(pick.present, pick.current)
+  const options = tagOptions(pick.present, pick.current)
   const widest = Math.max(...options.map(option => (option.label ?? option.value).length))
-  const key = `category:${pick.list}`
+  const key = `tag:${pick.list}`
   const onSelect = (value: string): Promise<void> =>
     value === pick.current
       ? Promise.resolve()
-      : env.dispatch({ key, command: { kind: 'category', list: pick.list, value } })
+      : env.dispatch({ key, command: { kind: 'tag', list: pick.list, value } })
   return {
     key: `filters:${pick.list}`,
-    element: <Select key={key} label={CATEGORY_LABEL} options={options} value={pick.current} onSelect={onSelect} />,
-    width: CATEGORY_LABEL.length + widest + SELECT_TRIM,
+    element: <Select key={key} label={TAG_LABEL} options={options} value={pick.current} onSelect={onSelect} />,
+    width: TAG_LABEL.length + widest + SELECT_TRIM,
   }
 }
 
-/** `No skill in Design & UX matches.` and the button that lifts the category filter. */
-export function categoryEmpty(env: Env, list: CategoryList, category: string): JSX.Element {
+/** `No skill tagged design matches.` and the button that lifts the tag filter. */
+export function tagEmpty(env: Env, list: TagList, tag: string): JSX.Element {
   const answer = actButton(
     env,
-    { key: `${list}-show-all-categories`, command: { kind: 'category', list, value: ALL_CATEGORIES } },
-    'Show all categories',
+    { key: `${list}-show-all-tags`, command: { kind: 'tag', list, value: ALL_TAGS } },
+    'Show all tags',
   )
-  return empty(env, `No skill in ${category} matches.`, answer, 24)
+  return empty(env, `No skill tagged ${tag} matches.`, answer, 20)
 }
 
 /** What a snapshot says before its data can be drawn: not loaded, failed, or older than the last refresh. */

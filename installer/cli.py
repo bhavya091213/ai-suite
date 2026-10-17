@@ -66,9 +66,11 @@ def _scope(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--scope", choices=SCOPES, help="disambiguate a name that exists in several scopes")
 
 
-def _category(parser: argparse.ArgumentParser) -> None:
+def _filters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--category", metavar="NAME",
                         help="only skills in this category (case-insensitive; see the categories command)")
+    parser.add_argument("--tag", metavar="NAME",
+                        help="only skills with this tag (case-insensitive; combines with --category)")
 
 
 def _mutating(parser: argparse.ArgumentParser, dry_run: bool = True) -> None:
@@ -88,9 +90,9 @@ def _skill_commands(sub) -> None:
     ):
         parser = _command(sub, name, func, text)
         _scope(parser)
-        _category(parser)
+        _filters(parser)
         _json(parser)
-    _json(_command(sub, "categories", cmd_categories, "skill categories with offered and installed counts"))
+    _json(_command(sub, "categories", cmd_categories, "skill categories and tags with offered and installed counts"))
     _json(_command(sub, "issues", cmd_issues, "duplicates, broken links, foreign entries, bad frontmatter"))
     for name, func, text in (
         ("install", cmd_install, "install skills from the repo (never overwrites)"),

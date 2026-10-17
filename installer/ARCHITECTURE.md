@@ -1063,7 +1063,10 @@ tabs). The third line is the status strip (coloured segments; `Working…` while
   five items (updates, issues, missing config) each with a button that jumps to the right view;
   a primary action row: `[Install 26 missing]` `[Check for updates]` `[Set up this machine]`
   (the last only when config.json is absent; it opens Settings).
-- **Install** (`i`): filter chips (`All · Shared · Claude · Codex`) as plain buttons, an `Input`
+- **Install** (`i`): filter chips (`All · Shared · Claude · Codex`) as plain buttons, a `Tag` `Select`
+  ("All tags" plus the tags present in the rows, in the order of `tags_order` from
+  `shared/skill-categories.json`, each with its count; cards show up to three tags after the scope),
+  an `Input`
   (`Filter by name…`, `onInput` updates the filter), then the cards of missing skills with
   `[Install <name>]`; a footer `[Install all 26]` that opens a confirm card.
 - **Installed** (`s`): filter chips `All · Modified · Problems · Foreign · Tool-managed`; cards

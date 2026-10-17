@@ -12,8 +12,8 @@ import { filterMissing, plural, updatable } from './summary'
 
 export type Named = { scope: string; name: string }
 
-/** The two views that filter by category, which are also the ids of their pagers. */
-export type CategoryList = 'install' | 'installed'
+/** The two views that filter by tag, which are also the ids of their pagers. */
+export type TagList = 'install' | 'installed'
 
 export type Command =
   | { kind: 'view'; view: AiSuiteView; installed?: AiSuiteInstalledFilter }
@@ -22,9 +22,9 @@ export type Command =
   | { kind: 'scope'; value: AiSuiteScopeFilter }
   | { kind: 'state'; value: AiSuiteInstalledFilter }
   | { kind: 'query'; text: string }
-  | { kind: 'category'; list: CategoryList; value: string }
+  | { kind: 'tag'; list: TagList; value: string }
   | { kind: 'install'; row: Named }
-  | { kind: 'install-all'; scope: AiSuiteScopeFilter; query: string; category: string }
+  | { kind: 'install-all'; scope: AiSuiteScopeFilter; query: string; tag: string }
   | { kind: 'update'; row: Named }
   | { kind: 'update-changed' }
   | { kind: 'relink'; row: Named }
@@ -105,7 +105,7 @@ export function confirmOf(command: Command, data: PaneData): Confirm {
       const count = filterMissing(rows, {
         installScope: command.scope,
         installQuery: command.query,
-        installCategory: command.category,
+        installTag: command.tag,
       }).length
       return {
         question: `Install ${plural(count, 'missing skill', 'missing skills')}?`,

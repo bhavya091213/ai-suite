@@ -1,6 +1,6 @@
 {
   "name": "ai-suite",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Skills manager inside Claude Code: a calm Skills pane (Overview, Install, Installed, Updates, Settings, Workflows, Doctor) that opens by itself at session start, with a Settings tab for ~/.agents/config.json, a one-row band above the prompt with Open and Hide buttons, a status line entry and /skills, /skills-check, as thin layers over the ai-suite installer CLI.",
   "author": { "name": "bhavya091213" },
   "types": "./types/index.d.ts",
