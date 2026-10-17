@@ -71,7 +71,9 @@ export const register: Register = (on, options) => {
     // The mobile app draws no text field or picker yet; it gets a one-line note instead.
     if (e.surface === 'mobile' || !('Input' in els) || !('Select' in els)) return renderUnsupported(els)
 
-    return renderPane(els, data, e.props.bodyColumns, act => pressAct($, settings, act))
+    // The desktop and the editor draw an Svg bar and a padded page; the terminal has no Svg.
+    const look = { surface: e.surface, Svg: 'Svg' in els ? els.Svg : null }
+    return renderPane(els, data, e.props.bodyColumns, act => pressAct($, settings, act), look)
   })
 
   // One row above the prompt, over whatever other mods draw there. It yields to a survey,

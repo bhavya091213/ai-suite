@@ -1,8 +1,9 @@
 // Updates: the git state of the repo, the commits you are behind, and the skills that changed upstream.
 import type { AiSuiteGit, AiSuiteUpdates } from '../types'
 import { CARDS_PER_PAGE, pageOf, plural, updatable } from './summary'
-import { STATE_BADGES, actButton, buttonRow, card, empty, fit, heading, line, note, pager, skillCard } from './ui'
+import { STATE_BADGES, actButton, actionRow, buttonRow, card, column, entry, fit, heading, line, skillCard } from './ui'
 import type { Env } from './ui'
+import { empty, note, pager } from './ui_parts'
 
 const COMMITS_SHOWN = 5
 
@@ -17,9 +18,12 @@ function gitCard(env: Env, git: AiSuiteGit): JSX.Element {
     'git',
     null,
     heading(env, 'Repository'),
-    line(env, git.message === '' ? 'No git information.' : git.message),
-    detail !== '' && line(env, detail, 'dim'),
-    git.hint !== '' && line(env, git.hint, 'warning'),
+    entry(
+      env,
+      line(env, git.message === '' ? 'No git information.' : git.message),
+      detail !== '' && line(env, detail, 'dim'),
+      git.hint !== '' && line(env, git.hint, 'warning'),
+    ),
     buttonRow(
       env,
       actButton(env, { key: 'fetch', command: { kind: 'fetch' } }, 'Fetch'),
@@ -35,17 +39,20 @@ function commitsCard(env: Env, commits: readonly string[]): JSX.Element {
     'commits',
     null,
     heading(env, 'Commits behind', String(commits.length)),
-    ...commits.slice(0, COMMITS_SHOWN).map(commit => {
-      const cut = commit.indexOf(' ')
-      const sha = cut < 0 ? commit : commit.slice(0, cut)
-      return (
-        <Box flexDirection="row" gap={1}>
-          <Text dimColor>{sha}</Text>
-          <Text wrap="truncate">{fit(env, cut < 0 ? '' : commit.slice(cut + 1), sha.length + 1)}</Text>
-        </Box>
-      )
-    }),
-    commits.length > COMMITS_SHOWN && <Text dimColor>{`… ${commits.length - COMMITS_SHOWN} more`}</Text>,
+    entry(
+      env,
+      ...commits.slice(0, COMMITS_SHOWN).map(commit => {
+        const cut = commit.indexOf(' ')
+        const sha = cut < 0 ? commit : commit.slice(0, cut)
+        return (
+          <Box flexDirection="row" gap={1}>
+            <Text dimColor>{sha}</Text>
+            <Text wrap="truncate">{fit(env, cut < 0 ? '' : commit.slice(cut + 1), sha.length + 1)}</Text>
+          </Box>
+        )
+      }),
+      commits.length > COMMITS_SHOWN && <Text dimColor>{`… ${commits.length - COMMITS_SHOWN} more`}</Text>,
+    ),
   )
 }
 
@@ -55,12 +62,12 @@ function changedCards(env: Env, found: AiSuiteUpdates): JSX.Element {
   const paged = pageOf(found.changed, env.data.pages.updates ?? 0, CARDS_PER_PAGE)
   const targets = updatable(rows, found)
   return (
-    <Box flexDirection="column">
+    <Box {...column(env)}>
       {heading(env, 'Skills with upstream changes', String(found.changed.length))}
       {paged.items.map(change => {
         const id = `${change.scope}/${change.name}`
         const row = rows.find(each => each.scope === change.scope && each.name === change.name)
-        const badge = STATE_BADGES[row?.state ?? ''] ?? { text: '· not on this machine', tone: 'dim' as const }
+        const badge = STATE_BADGES[row?.state ?? ''] ?? { glyph: '·', word: 'not on this machine', tone: 'dim' as const }
         return skillCard(env, {
           scope: change.scope,
           name: change.name,
@@ -68,13 +75,13 @@ function changedCards(env: Env, found: AiSuiteUpdates): JSX.Element {
           summary: { text: `${plural(change.files, 'file', 'files')} changed upstream`, tone: 'dim' },
           buttons: [
             row?.state === 'modified' &&
-              actButton(env, { key: `update:${id}`, command: { kind: 'update', row: change } }, fit(env, `Update ${change.name}`, 24)),
+              actButton(env, { key: `update:${id}`, command: { kind: 'update', row: change } }, fit(env, `Update ${change.name}`, 24), { lead: true }),
           ],
         })
       })}
       {pager(env, 'updates', paged, found.changed.length, CARDS_PER_PAGE)}
       {targets.length > 0 &&
-        buttonRow(
+        actionRow(
           env,
           actButton(
             env,
@@ -93,7 +100,7 @@ export function updates(env: Env): JSX.Element {
   const found = snap.data
   const isQuiet = found !== null && found.commits.length === 0 && found.changed.length === 0
   return (
-    <Box flexDirection="column">
+    <Box {...column(env)}>
       {note(env, snap, 'updates')}
       {found !== null && gitCard(env, found.git)}
       {isQuiet && empty(env, 'Nothing has changed upstream.', actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh'))}

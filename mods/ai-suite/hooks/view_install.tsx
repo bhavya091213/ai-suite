@@ -1,8 +1,9 @@
 // Install: filter chips and a name filter over the skills the repo offers that are not installed yet.
 import type { AiSuiteScopeFilter } from '../types'
 import { CARDS_PER_PAGE, filterMissing, missingRows, pageOf } from './summary'
-import { STATE_BADGES, actButton, buttonRow, card, chips, empty, fit, heading, note, pager, skillCard } from './ui'
+import { STATE_BADGES, actButton, below, buttonRow, card, chips, column, fit, heading, skillCard } from './ui'
 import type { Env } from './ui'
+import { empty, note, pager } from './ui_parts'
 
 const SCOPE_CHIPS: readonly { value: AiSuiteScopeFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -25,30 +26,29 @@ export function install(env: Env): JSX.Element {
   const search = (text: string): Promise<void> =>
     env.dispatch({ key: 'install-query', command: { kind: 'query', text } })
   return (
-    <Box flexDirection="column">
+    <Box {...column(env)}>
       {note(env, status, 'skills')}
+      {status.data !== null &&
+        chips(
+          env,
+          SCOPE_CHIPS.map(chip => ({
+            key: chip.value,
+            label: chip.label,
+            isActive: chip.value === installScope,
+            act: { key: `install-scope:${chip.value}`, command: { kind: 'scope', value: chip.value } },
+          })),
+        )}
       {status.data !== null && (
-        <Box flexDirection="column">
-          {chips(
-            env,
-            SCOPE_CHIPS.map(chip => ({
-              key: chip.value,
-              label: chip.label,
-              isActive: chip.value === installScope,
-              act: { key: `install-scope:${chip.value}`, command: { kind: 'scope', value: chip.value } },
-            })),
-          )}
-          <Box marginBottom={1}>
-            <Input
-              key="install-query"
-              label="Filter"
-              placeholder="Filter by name…"
-              value={installQuery}
-              submitLabel="filter"
-              onInput={search}
-              onSubmit={search}
-            />
-          </Box>
+        <Box {...below(env)}>
+          <Input
+            key="install-query"
+            label="Filter"
+            placeholder="Filter by name…"
+            value={installQuery}
+            submitLabel="filter"
+            onInput={search}
+            onSubmit={search}
+          />
         </Box>
       )}
       {status.data !== null && missing.length === 0 &&
@@ -59,13 +59,14 @@ export function install(env: Env): JSX.Element {
         skillCard(env, {
           scope: row.scope,
           name: row.name,
-          badges: [STATE_BADGES['not-installed'] ?? { text: '· missing', tone: 'dim' }],
+          badges: [STATE_BADGES['not-installed'] ?? { glyph: '·', word: 'missing', tone: 'dim' }],
           summary: { text: row.description === '' ? '(no description)' : row.description, tone: 'dim' },
           buttons: [
             actButton(
               env,
               { key: `install:${row.scope}/${row.name}`, command: { kind: 'install', row } },
               fit(env, `Install ${row.name}`, 24),
+              { lead: true },
             ),
           ],
         }),

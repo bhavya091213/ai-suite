@@ -40,23 +40,37 @@ export function countByScope(rows: readonly AiSuiteSkillRow[]): ScopeCount[] {
   })
 }
 
-/** `57 installed · 6 modified · 26 missing · 0 problems`, the line under a scope's bar. */
-export function scopeNumbers(count: ScopeCount): string {
-  return `${count.installed} installed · ${count.modified} modified · ${count.missing} missing · ` +
-    plural(count.problems, 'problem', 'problems')
+export type CountTone = 'success' | 'warning' | 'dim' | 'error'
+export type CountPart = { value: number; word: string; tone: CountTone }
+
+/** The four numbers under a scope's bar: installed, modified, missing and problems, each with its tone. */
+export function scopeParts(count: ScopeCount): CountPart[] {
+  return [
+    { value: count.installed, word: 'installed', tone: 'success' },
+    { value: count.modified, word: 'modified', tone: 'warning' },
+    { value: count.missing, word: 'missing', tone: 'dim' },
+    { value: count.problems, word: count.problems === 1 ? 'problem' : 'problems', tone: 'error' },
+  ]
 }
 
-/** How many of `width` cells a bar fills for `part` of `total`, and how many it leaves empty. */
-export function barCells(part: number, total: number, width: number): { filled: number; empty: number } {
-  const cells = Math.max(1, width)
-  const filled = total <= 0 ? 0 : Math.min(cells, Math.round((part / total) * cells))
-  return { filled, empty: cells - filled }
-}
+/** `57 installed · 6 modified · 26 missing · 0 problems`, the terminal's line under a scope's bar. */
+export const scopeNumbers = (count: ScopeCount): string =>
+  scopeParts(count).map(part => `${part.value} ${part.word}`).join(' · ')
 
-/** A bar of `width` cells made of `█` and `░` (an empty total is an empty bar). */
-export function bar(part: number, total: number, width: number): string {
-  const { filled, empty } = barCells(part, total, width)
-  return '█'.repeat(filled) + '░'.repeat(empty)
+export type BarSegments = { ok: number; mod: number; rest: number }
+
+/**
+ * How a bar of `cells` units divides: `ok` installed, `mod` modified (drawn after them), `rest`
+ * missing. Installed and modified together fill `present / offered` of the bar; a skill that
+ * is there at all gets a unit, and an empty offer is an empty bar.
+ */
+export function barSegments(installed: number, modified: number, offered: number, cells: number): BarSegments {
+  const total = Math.max(1, cells)
+  const present = installed + modified
+  if (offered <= 0 || present <= 0) return { ok: 0, mod: 0, rest: total }
+  const filled = Math.min(total, Math.max(1, Math.round((present / offered) * total)))
+  const mod = modified === 0 ? 0 : Math.min(filled, Math.max(1, Math.round((modified / offered) * total)))
+  return { ok: filled - mod, mod, rest: total - filled }
 }
 
 export const plural = (n: number, one: string, many: string): string =>

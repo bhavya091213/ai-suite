@@ -9,15 +9,16 @@ import {
   buttonRow,
   card,
   chips,
-  empty,
+  column,
+  entry,
   heading,
+  hue,
   linesOf,
-  note,
-  pager,
   skillCard,
   toneProps,
 } from './ui'
 import type { Badge, Env, Tone } from './ui'
+import { empty, note, pager } from './ui_parts'
 
 const FILTER_CHIPS: readonly { value: AiSuiteInstalledFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -43,7 +44,7 @@ function linkDots(env: Env, row: AiSuiteSkillRow): JSX.Element | null {
       {row.links.map(link => (
         <Box flexDirection="row" gap={1}>
           <Text dimColor>{link.consumer}</Text>
-          <Text {...toneProps(linkTone(link.state))}>●</Text>
+          <Text {...(env.isDesktop ? { color: hue(linkTone(link.state)) } : toneProps(linkTone(link.state)))}>●</Text>
         </Box>
       ))}
     </Box>
@@ -59,8 +60,11 @@ function filesCard(env: Env, id: string, text: string): JSX.Element {
     `files-card:${id}`,
     null,
     heading(env, 'Files', id),
-    ...shown.map(each => <Text wrap="truncate">{each}</Text>),
-    all.length > shown.length && <Text dimColor>{`… ${all.length - shown.length} more lines`}</Text>,
+    entry(
+      env,
+      ...shown.map(each => <Text wrap="truncate">{each}</Text>),
+      all.length > shown.length && <Text dimColor>{`… ${all.length - shown.length} more lines`}</Text>,
+    ),
     buttonRow(env, actButton(env, { key: 'close-files', command: { kind: 'close-detail' } }, 'Close')),
   )
 }
@@ -70,7 +74,7 @@ function installedCard(env: Env, row: AiSuiteSkillRow): JSX.Element {
   const named = { scope: row.scope, name: row.name }
   const detail = env.data.detail
   const isFilesOpen = detail?.kind === 'files' && detail.id === id
-  const stateBadge: Badge = STATE_BADGES[row.state] ?? { text: row.state, tone: 'dim' }
+  const stateBadge: Badge = STATE_BADGES[row.state] ?? { glyph: '·', word: row.state, tone: 'dim' }
   const summary =
     row.hasProblem && row.note !== ''
       ? { text: `! ${row.note}`, tone: 'warning' as const }
@@ -82,7 +86,8 @@ function installedCard(env: Env, row: AiSuiteSkillRow): JSX.Element {
     summary,
     aside: row.scope === 'shared' ? linkDots(env, row) : null,
     buttons: [
-      row.state === 'modified' && actButton(env, { key: `update:${id}`, command: { kind: 'update', row: named } }, 'Update'),
+      row.state === 'modified' &&
+        actButton(env, { key: `update:${id}`, command: { kind: 'update', row: named } }, 'Update', { lead: true }),
       row.canRelink && actButton(env, { key: `relink:${id}`, command: { kind: 'relink', row: named } }, 'Relink'),
       row.canRetire &&
         actButton(env, { key: `retire:${id}`, command: { kind: 'retire', row: named }, confirm: true }, 'Retire…'),
@@ -101,7 +106,7 @@ export function installed(env: Env): JSX.Element {
   const paged = pageOf(shown, env.data.pages.installed ?? 0, CARDS_PER_PAGE)
   const detail = env.data.detail
   return (
-    <Box flexDirection="column">
+    <Box {...column(env)}>
       {note(env, status, 'skills')}
       {status.data !== null &&
         chips(

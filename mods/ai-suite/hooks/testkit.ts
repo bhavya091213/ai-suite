@@ -6,6 +6,15 @@ import type { Engine } from 'claude-code/testing'
 
 export const REPO = '/work/ai-suite'
 export const SURFACES = ['terminal', 'desktop'] as const
+/** Every surface the pane draws on: the editor's webview is a desktop-style page without `Client`. */
+export type Surface = (typeof SURFACES)[number] | 'vscode'
+/** The desktop app and the editor share one look (padded page, Svg bar, tabs without hotkeys). */
+export const isDesktop = (surface: Surface): boolean => surface !== 'terminal'
+/** `text` as an anchored pattern, its punctuation taken literally. */
+export const exact = (text: string): RegExp => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+/** A badge as the surface draws it: `✓ installed` in the terminal, `● installed` on the desktop. */
+export const badgeText = (surface: Surface, terminal: string): string =>
+  isDesktop(surface) ? terminal.replace(/^\S+/, '●') : terminal
 export const PY = ['python3', '-m', 'installer', '--repo', REPO]
 export const AT_REPO = { options: { repoPath: REPO } }
 
@@ -231,7 +240,7 @@ export const run = (name: string) => ({
   presentation: { isFullscreen: true, columns: 100 },
 })
 
-export function mountPane($: Engine, surface: (typeof SURFACES)[number], props = PANE, rows = 40) {
+export function mountPane($: Engine, surface: Surface, props = PANE, rows = 40) {
   return $.ui.mount({
     plugin: 'ai-suite',
     surface,
@@ -252,7 +261,7 @@ export const BAND: RenderPropsOf['AbovePrompt'] = {
 }
 
 /** Mounts the band above the prompt the way the engine draws it (it has no requestId of its own). */
-export function mountBand($: Engine, surface: (typeof SURFACES)[number], props = BAND) {
+export function mountBand($: Engine, surface: Surface, props = BAND) {
   return $.ui.mount({
     plugin: 'ai-suite',
     surface,
@@ -261,8 +270,6 @@ export function mountBand($: Engine, surface: (typeof SURFACES)[number], props =
     viewport: { columns: 100, rows: 30 },
   })
 }
-
-type Surface = (typeof SURFACES)[number]
 
 /** The usual start of a view test: the world, `/skills`, the pane mounted on `surface` and pressed over to `view`. */
 export async function openTo($: Engine, on: On, surface: Surface, options: WorldOptions = {}, view = 'overview') {

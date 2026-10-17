@@ -1,20 +1,23 @@
-// The pieces every view is built from: the header, cards, badges, buttons, the confirm card, the
-// error callout, the pager, empty states and width-aware truncation. All of it is drawing: a
-// pure function of PaneData, with a button's press handed to `dispatch` (the hook binds its `$`).
-import type { Elements } from 'claude-code'
-import type { AiSuiteSnapshot } from '../types'
+// The pieces every view is built from: the surface-aware environment, text and buttons, cards,
+// badges and the skill card. All of it is drawing: a pure function of PaneData, with a button's
+// press handed to `dispatch` (the hook binds its `$`). The surface branch lives here and in
+// ui_parts.tsx / pane.tsx, so the views stay surface-agnostic: the terminal is a character grid
+// (bordered cards, hotkeys, `━` bars), the desktop app and the editor are not (padded cards, a
+// blank row between things, an Svg bar, tabs without key caps).
+import type { BoxProps, Elements } from 'claude-code'
 import { truncate } from './cli'
-import { confirmOf, decodeConfirm } from './commands'
 import type { Act } from './commands'
-import { VIEWS } from './state'
 import type { PaneData } from './state'
-import { plural, skillCounts } from './summary'
-import type { Page } from './summary'
 
 /** The three elements every surface has: all the band draws with. */
 export type Els = Pick<Elements['terminal'], 'Box' | 'Text' | 'Button'>
 /** What the pane draws with: the terminal, desktop and editor tables hold all five. */
 export type PaneEls = Els & Pick<Elements['terminal'], 'Input' | 'Select'>
+/** The vector leaf the desktop and the editor have and the terminal lacks. */
+export type SvgEl = Elements['desktop']['Svg']
+export type Surface = 'terminal' | 'desktop' | 'vscode'
+export type Look = { surface: Surface; Svg: SvgEl | null }
+export const TERMINAL_LOOK: Look = { surface: 'terminal', Svg: null }
 export type Dispatch = (act: Act) => Promise<void>
 
 export type Env = {
@@ -22,24 +25,49 @@ export type Env = {
   data: PaneData
   /** Cells across the pane's body. */
   columns: number
-  /** Cells of text inside a card (its border and padding taken out). */
+  /** Cells of text inside a card (the pane's padding, the card's border and padding taken out). */
   inner: number
   dispatch: Dispatch
   /** True while a command runs or a confirm card is up: card buttons draw dim. */
   isLocked: boolean
+  /** True on the desktop app and the editor: spacing instead of margins, no hotkeys, an Svg bar. */
+  isDesktop: boolean
+  Svg: SvgEl | null
 }
 
-export function makeEnv(els: PaneEls, data: PaneData, bodyColumns: number, dispatch: Dispatch): Env {
+// Root padding 2+2, card border 1+1, card padding 2+2 on the desktop; border 1+1 and padding 1+1 in the terminal.
+const DESKTOP_CHROME = 10
+const TERMINAL_CHROME = 4
+
+export function makeEnv(
+  els: PaneEls,
+  data: PaneData,
+  bodyColumns: number,
+  dispatch: Dispatch,
+  look: Look = TERMINAL_LOOK,
+): Env {
   const columns = bodyColumns > 0 ? bodyColumns : 60
+  const isDesktop = look.surface !== 'terminal'
   return {
     els,
     data,
     columns,
-    inner: Math.max(16, columns - 4),
+    inner: Math.max(16, columns - (isDesktop ? DESKTOP_CHROME : TERMINAL_CHROME)),
     dispatch,
     isLocked: data.busy !== null || data.pending !== null,
+    isDesktop,
+    Svg: look.Svg,
   }
 }
+
+// ------------------------------------------------------------------- spacing
+
+/** A view's column: on the desktop one blank row between its children, in the terminal none (cards bring a margin). */
+export const column = (env: Env): Pick<BoxProps, 'flexDirection' | 'gap'> =>
+  env.isDesktop ? { flexDirection: 'column', gap: 1 } : { flexDirection: 'column' }
+
+/** The blank row under a terminal block; the desktop spaces with `gap` instead. */
+export const below = (env: Env): Pick<BoxProps, 'marginBottom'> => (env.isDesktop ? {} : { marginBottom: 1 })
 
 // --------------------------------------------------------------------- text
 
@@ -47,6 +75,17 @@ export type Tone = 'plain' | 'dim' | 'success' | 'warning' | 'error' | 'magenta'
 
 export const toneProps = (tone: Tone): { dimColor?: true; color?: string } =>
   tone === 'plain' ? {} : tone === 'dim' ? { dimColor: true } : { color: tone }
+
+/** The theme key a tone is drawn in on the desktop (dim is `subtle`, magenta is Claude's accent). */
+const HUES: Record<Tone, string> = {
+  plain: 'text',
+  dim: 'subtle',
+  success: 'success',
+  warning: 'warning',
+  error: 'error',
+  magenta: 'claude',
+}
+export const hue = (tone: Tone): string => HUES[tone]
 
 /** Cuts `text` to the card's inner width less `used` cells already taken on the line. */
 export const fit = (env: Env, text: string, used = 0): string => truncate(text, Math.max(8, env.inner - used))
@@ -78,10 +117,13 @@ export const linesOf = (env: Env, text: string): string[] =>
 
 export type ButtonOptions = {
   primary?: true
+  /** A card's main action: primary on the desktop, an ordinary button in the terminal. */
+  lead?: true
+  /** Shown in the terminal only: the desktop draws a hotkey as a key cap, so it is left off there. */
   hotkey?: string
   /** Drawn without brackets (a tab, a chip, a confirm answer). */
   plain?: true
-  /** Draws the active tab or chip: bold and underlined. */
+  /** Draws a tab or chip: the chosen one bold and underlined (in Claude's colour on the desktop), the rest dim there. */
   isActive?: boolean
   /** Draw at full strength even while the pane is locked (the confirm card's own answers). */
   isLive?: true
@@ -89,17 +131,20 @@ export type ButtonOptions = {
 
 export function actButton(env: Env, act: Act, label: string, options: ButtonOptions = {}): JSX.Element {
   const { Button, Text } = env.els
+  const isIdle = env.isDesktop && options.isActive === false
+  const isPrimary = options.primary === true || (options.lead === true && env.isDesktop)
   const extra = {
-    ...(options.hotkey === undefined ? {} : { hotkey: options.hotkey }),
-    ...(options.primary === true ? { variant: 'primary' as const } : {}),
+    ...(options.hotkey === undefined || env.isDesktop ? {} : { hotkey: options.hotkey }),
+    ...(isPrimary ? { variant: 'primary' as const } : {}),
     ...(options.plain === true ? { plain: true as const } : {}),
-    ...(env.isLocked && options.isLive !== true ? { dimColor: true } : {}),
+    ...((env.isLocked && options.isLive !== true) || isIdle ? { dimColor: true } : {}),
   }
   const press = () => env.dispatch(act)
   if (options.isActive === true) {
+    const accent = env.isDesktop ? { color: 'claude' as const } : {}
     return (
       <Button key={act.key} label={label} {...extra} onPress={press}>
-        <Text bold underline>{label}</Text>
+        <Text bold underline {...accent}>{label}</Text>
       </Button>
     )
   }
@@ -113,31 +158,63 @@ export function chips(
 ): JSX.Element {
   const { Box } = env.els
   return (
-    <Box flexDirection="row" flexWrap="wrap" gap={2} marginBottom={1}>
+    <Box flexDirection="row" flexWrap="wrap" gap={2} {...below(env)}>
       {items.map(item => actButton(env, item.act, item.label, { plain: true, isActive: item.isActive }))}
+    </Box>
+  )
+}
+
+export type Child = JSX.Element | false | null | undefined
+
+const present = (items: readonly Child[]): JSX.Element[] =>
+  items.filter((item): item is JSX.Element => item !== false && item !== null && item !== undefined)
+
+/** A card's row of buttons, pushed to the right. */
+export function buttonRow(env: Env, ...buttons: Child[]): JSX.Element | null {
+  const shown = present(buttons)
+  if (shown.length === 0) return null
+  const { Box } = env.els
+  return (
+    <Box flexDirection="row" gap={1} justifyContent="flex-end">
+      {shown}
+    </Box>
+  )
+}
+
+/** A view's row of actions, from the left, wrapping when the pane is narrow. */
+export function actionRow(env: Env, ...buttons: Child[]): JSX.Element | null {
+  const shown = present(buttons)
+  if (shown.length === 0) return null
+  const { Box } = env.els
+  return (
+    <Box flexDirection="row" flexWrap="wrap" gap={1} justifyContent="flex-start">
+      {shown}
     </Box>
   )
 }
 
 // --------------------------------------------------------------------- cards
 
-export type Child = JSX.Element | false | null | undefined
+const BORDERS: Record<Tone, string> = { ...HUES, plain: 'inactive', dim: 'inactive' }
 
 export function card(env: Env, key: string, accent: Tone | null, ...children: Child[]): JSX.Element {
   const { Box } = env.els
-  const border = accent === null ? {} : { borderColor: accent }
+  const look: BoxProps = env.isDesktop
+    ? { paddingX: 2, paddingY: 1, gap: 1, width: '100%', borderColor: BORDERS[accent ?? 'plain'] }
+    : { paddingX: 1, paddingY: 0, marginBottom: 1, ...(accent === null ? {} : { borderColor: accent }) }
   return (
-    <Box key={key} borderStyle="round" paddingX={1} paddingY={0} flexDirection="column" marginBottom={1} {...border}>
+    <Box key={key} borderStyle="round" flexDirection="column" {...look}>
       {children}
     </Box>
   )
 }
 
-/** A card's heading: the title in bold and, dim after it, a count or a hint. */
+/** A card's heading: the title in bold and, dim after it (at the far edge on the desktop), a count or a hint. */
 export function heading(env: Env, title: string, hint = ''): JSX.Element {
   const { Box, Text } = env.els
+  const look: BoxProps = env.isDesktop ? { justifyContent: 'space-between', gap: 2 } : { gap: 1 }
   return (
-    <Box flexDirection="row" gap={1}>
+    <Box flexDirection="row" {...look}>
       <Text bold wrap="truncate">{fit(env, title, hint.length + 1)}</Text>
       {hint !== '' && <Text dimColor wrap="truncate">{hint}</Text>}
     </Box>
@@ -150,34 +227,54 @@ export function line(env: Env, text: string, tone: Tone = 'plain'): JSX.Element 
   return <Text {...toneProps(tone)} wrap="truncate">{fit(env, text)}</Text>
 }
 
-/** A card's row of buttons, pushed to the right. */
-export function buttonRow(env: Env, ...buttons: Child[]): JSX.Element | null {
-  const shown = buttons.filter(button => button !== false && button !== null && button !== undefined)
-  if (shown.length === 0) return null
+/** A card row's title line: what it is called on the left, its badges or meta on the right (the desktop pushes them apart). */
+export function titleRow(env: Env, left: readonly JSX.Element[], right: readonly JSX.Element[]): JSX.Element {
   const { Box } = env.els
+  if (!env.isDesktop) {
+    return (
+      <Box flexDirection="row" gap={1}>
+        {left}
+        {right}
+      </Box>
+    )
+  }
   return (
-    <Box flexDirection="row" gap={1} justifyContent="flex-end">
-      {shown}
+    <Box flexDirection="row" justifyContent="space-between" gap={2}>
+      <Box flexDirection="row" gap={1}>{left}</Box>
+      <Box flexDirection="row" gap={2}>{right}</Box>
     </Box>
   )
 }
 
+/** A title line and the line under it, kept together even where the card spaces its children apart. */
+export function entry(env: Env, ...lines: Child[]): JSX.Element {
+  const { Box } = env.els
+  return <Box flexDirection="column">{lines}</Box>
+}
+
 // -------------------------------------------------------------------- badges
 
-export type Badge = { text: string; tone: Tone }
+/** The terminal draws `glyph word` in the tone; the desktop draws `● word` in the matching theme colour. */
+export type Badge = { glyph: string; word: string; tone: Tone }
 
 export const STATE_BADGES: Record<string, Badge> = {
-  installed: { text: '✓ installed', tone: 'success' },
-  modified: { text: '≠ modified', tone: 'warning' },
-  'not-installed': { text: '· missing', tone: 'dim' },
-  foreign: { text: '? foreign', tone: 'magenta' },
-  ignored: { text: '⚙ tool-managed', tone: 'dim' },
+  installed: { glyph: '✓', word: 'installed', tone: 'success' },
+  modified: { glyph: '≠', word: 'modified', tone: 'warning' },
+  'not-installed': { glyph: '·', word: 'missing', tone: 'dim' },
+  foreign: { glyph: '?', word: 'foreign', tone: 'magenta' },
+  ignored: { glyph: '⚙', word: 'tool-managed', tone: 'dim' },
 }
-export const PROBLEM_BADGE: Badge = { text: '! problem', tone: 'error' }
+export const PROBLEM_BADGE: Badge = { glyph: '!', word: 'problem', tone: 'error' }
+
+export const badgeWidth = (env: Env, item: Badge): number => item.word.length + (env.isDesktop ? 2 : item.glyph.length + 1)
 
 export function badge(env: Env, item: Badge): JSX.Element {
   const { Text } = env.els
-  return <Text {...toneProps(item.tone)} wrap="truncate">{item.text}</Text>
+  return env.isDesktop ? (
+    <Text color={hue(item.tone)} wrap="truncate">{`● ${item.word}`}</Text>
+  ) : (
+    <Text {...toneProps(item.tone)} wrap="truncate">{`${item.glyph} ${item.word}`}</Text>
+  )
 }
 
 export type SkillCard = {
@@ -191,178 +288,32 @@ export type SkillCard = {
   buttons: readonly Child[]
 }
 
-/** The skill card of the spec: name, scope badge and state badges; one description line; one button line. */
+/** The skill card of the spec: name, scope and state badges; one description line; one button line. */
 export function skillCard(env: Env, spec: SkillCard): JSX.Element {
   const { Box, Text } = env.els
-  const scope = `[${spec.scope}]`
-  const used = scope.length + spec.badges.reduce((sum, item) => sum + item.text.length + 1, 0) + 1
+  const scope = env.isDesktop ? spec.scope : `[${spec.scope}]`
+  const used = scope.length + spec.badges.reduce((sum, item) => sum + badgeWidth(env, item) + 1, 0) + (env.isDesktop ? 4 : 1)
   const buttons = buttonRow(env, ...spec.buttons)
   return card(
     env,
     `card:${spec.scope}/${spec.name}`,
     null,
-    <Box flexDirection="row" gap={1}>
-      <Text bold wrap="truncate">{fit(env, spec.name, used)}</Text>
-      <Text dimColor>{scope}</Text>
-      {spec.badges.map(item => badge(env, item))}
-    </Box>,
-    <Text {...toneProps(spec.summary.tone)} wrap="truncate">{fit(env, spec.summary.text)}</Text>,
-    (spec.aside || buttons) && (
-      <Box flexDirection="row" justifyContent="space-between" marginTop={0}>
-        {spec.aside ?? <Text> </Text>}
+    entry(
+      env,
+      titleRow(
+        env,
+        [<Text bold wrap="truncate">{fit(env, spec.name, used)}</Text>, <Text dimColor>{scope}</Text>],
+        spec.badges.map(item => badge(env, item)),
+      ),
+      <Text {...toneProps(spec.summary.tone)} wrap="truncate">{fit(env, spec.summary.text)}</Text>,
+    ),
+    spec.aside ? (
+      <Box flexDirection="row" justifyContent="space-between">
+        {spec.aside}
         {buttons}
       </Box>
+    ) : (
+      buttons
     ),
-  )
-}
-
-// ----------------------------------------------------------- notes and empties
-
-/** One dim sentence and, if given, the one button that answers it. */
-export function empty(env: Env, text: string, answer?: JSX.Element): JSX.Element {
-  const { Box, Text } = env.els
-  return (
-    <Box key="empty" flexDirection="row" gap={1} marginBottom={1}>
-      <Text dimColor wrap="truncate">{fit(env, text, answer === undefined ? 0 : 16)}</Text>
-      {answer}
-    </Box>
-  )
-}
-
-/** What a snapshot says before its data can be drawn: not loaded, failed, or older than the last refresh. */
-export function note(env: Env, snap: AiSuiteSnapshot<unknown>, what: string): JSX.Element | null {
-  const { Text } = env.els
-  if (snap.data === null && snap.error === null) return <Text dimColor>{`Loading ${what}…`}</Text>
-  if (snap.data === null) {
-    return card(env, `load-error:${what}`, 'error', <Text color="error" wrap="truncate">{fit(env, `${what}: ${snap.error ?? ''}`)}</Text>)
-  }
-  if (snap.error === null) return null
-  return <Text color="warning" wrap="truncate">{truncate(`Showing older ${what}; the last refresh failed: ${snap.error}`, env.columns)}</Text>
-}
-
-/** The red-bordered callout: a title and the message, wrapped to the card (never inside one line). */
-export function callout(env: Env, title: string, text: string, ...extra: Child[]): JSX.Element {
-  const { Text } = env.els
-  return card(
-    env,
-    `callout:${title}`,
-    'error',
-    <Text bold color="error">{title}</Text>,
-    ...wrapText(text, env.inner, 4).map(each => <Text>{each}</Text>),
-    ...extra,
-  )
-}
-
-// --------------------------------------------------------------------- pager
-
-export const showing = (paged: Page<unknown>, total: number, size: number): string =>
-  `Showing ${paged.page * size + 1}-${Math.min(total, paged.page * size + paged.items.length)} of ${total}`
-
-/** `‹ Prev`, `Showing 1-5 of 26`, `Next ›`; nothing while everything fits one page. */
-export function pager(env: Env, list: string, paged: Page<unknown>, total: number, size: number): JSX.Element | null {
-  if (paged.pages <= 1) return null
-  const { Box, Text } = env.els
-  return (
-    <Box key={`pager:${list}`} flexDirection="row" gap={1} marginBottom={1}>
-      {paged.page > 0 && actButton(env, { key: `prev:${list}`, command: { kind: 'page', list, page: paged.page - 1 } }, '‹ Prev')}
-      <Text dimColor>{showing(paged, total, size)}</Text>
-      {paged.page < paged.pages - 1 &&
-        actButton(env, { key: `next:${list}`, command: { kind: 'page', list, page: paged.page + 1 } }, 'Next ›')}
-    </Box>
-  )
-}
-
-// ------------------------------------------------------------ confirm card
-
-/** The highlighted card that replaces a two-press confirm: question, consequence, `[y]` and `[n]`. */
-export function confirmCard(env: Env): JSX.Element | null {
-  const pending = env.data.pending
-  if (pending === null) return null
-  const { Text } = env.els
-  const command = decodeConfirm(pending)
-  const cancel = actButton(env, { key: 'confirm-no', command: { kind: 'no' } }, 'Cancel', {
-    plain: true,
-    hotkey: 'n',
-    isLive: true,
-  })
-  if (command === null) {
-    return card(env, 'confirm', 'warning', <Text bold>This confirmation is no longer valid.</Text>, buttonRow(env, cancel))
-  }
-  const words = confirmOf(command, env.data)
-  const yes = actButton(env, { key: 'confirm-yes', command: { kind: 'yes' } }, words.yes, {
-    plain: true,
-    hotkey: 'y',
-    primary: true,
-    isLive: true,
-  })
-  return card(
-    env,
-    'confirm',
-    'warning',
-    <Text bold wrap="truncate">{fit(env, words.question)}</Text>,
-    ...wrapText(words.detail, env.inner, 2).map(each => <Text dimColor>{each}</Text>),
-    buttonRow(env, yes, cancel),
-  )
-}
-
-// -------------------------------------------------------------------- header
-
-type Segment = { text: string; tone: Tone }
-
-function strip(data: PaneData): Segment[] {
-  const { status, updates } = data.snapshots
-  const out: Segment[] = []
-  if (status.data !== null) {
-    const counts = skillCounts(status.data, updates)
-    out.push({ text: `${counts.present}/${counts.offered} installed`, tone: counts.present === counts.offered ? 'success' : 'plain' })
-    if (counts.changed > 0) out.push({ text: plural(counts.changed, 'update', 'updates'), tone: 'warning' })
-    if (counts.problems > 0) out.push({ text: plural(counts.problems, 'issue', 'issues'), tone: 'error' })
-  } else {
-    out.push({ text: status.error === null ? 'Loading…' : 'status unavailable', tone: status.error === null ? 'dim' : 'error' })
-  }
-  if (data.busy !== null) out.push({ text: `Working… ${data.busy.label}`, tone: 'warning' })
-  return out
-}
-
-function repoLine(data: PaneData): Segment {
-  const { repo } = data
-  if (repo !== null && repo.error !== '') return { text: 'repo not found', tone: 'error' }
-  const git = data.snapshots.updates.data?.git
-  const parts = [
-    repo?.shown ?? '',
-    git?.branch ?? '',
-    git === undefined ? '' : git.behind > 0 ? `${git.behind} behind` : '',
-  ].filter(part => part !== '')
-  return { text: parts.join(' · '), tone: 'dim' }
-}
-
-/** Title and repo line, the tab row (hotkeys `o i s u t w d`) and the status strip. */
-export function header(env: Env): JSX.Element {
-  const { Box, Text } = env.els
-  const title = 'AI Suite · Skills'
-  const right = repoLine(env.data)
-  const segments = strip(env.data)
-  return (
-    <Box key="header" flexDirection="column" marginBottom={1}>
-      <Box flexDirection="row" justifyContent="space-between">
-        <Text bold>{title}</Text>
-        <Text {...toneProps(right.tone)} wrap="truncate">{truncate(right.text, Math.max(8, env.columns - title.length - 2))}</Text>
-      </Box>
-      <Box flexDirection="row" flexWrap="wrap" gap={1}>
-        {VIEWS.map(entry =>
-          actButton(env, { key: `view-${entry.id}`, command: { kind: 'view', view: entry.id } }, entry.label, {
-            plain: true,
-            hotkey: entry.hotkey,
-            isActive: entry.id === env.data.view,
-          }),
-        )}
-      </Box>
-      <Box flexDirection="row" gap={1}>
-        {segments.flatMap((segment, at) => [
-          at > 0 ? <Text key={`dot-${at}`} dimColor>·</Text> : null,
-          <Text key={`segment-${at}`} {...toneProps(segment.tone)} wrap="truncate">{segment.text}</Text>,
-        ])}
-      </Box>
-    </Box>
   )
 }

@@ -1112,3 +1112,40 @@ options and the current value selected; choosing an option runs `config set` wit
 argv; `Custom…` reveals an Input whose submit runs `config set`; the confirm card appears for
 Retire / Pull / Install all / Apply, `y` runs and `n` cancels; paging buttons move the page; the
 missing-config callout appears when `config list --json` reports `exists: false`.
+
+## Desktop layer (mod v0.4)
+
+The Desktop app is not a character grid: block characters stretch into solid slabs, hotkey
+chips draw as key caps, and zero padding reads as a wall of text. The shared pieces in
+`hooks/ui.tsx` and `hooks/pane.tsx` therefore branch on `e.surface` (`desktop` and `vscode`
+versus `terminal`); the views never check the surface themselves. Only props present in the
+engine's own type declarations are used (no `size`/`weight` text props, no spacing step names).
+
+Desktop/VS Code:
+- Pane root: `Box` column, `paddingX: 2`, `paddingY: 1`, `gap: 1`, `width: '100%'`.
+- Header: a row with `justifyContent: 'space-between'`: bold `Skills` left, dim
+  `<repo> · <branch> · N behind` right; under it the tab row: plain `Button`s **without
+  hotkeys**, separated by `gap: 2`; the active tab bold with `color: 'claude'` and `underline`,
+  the others `dimColor`; under it the status strip: `●` glyphs coloured `success` / `warning` /
+  `error` followed by dim labels, `gap: 2`.
+- Card: `Box` column, `borderStyle: 'round'`, `borderColor: 'inactive'`, `paddingX: 2`,
+  `paddingY: 1`, `gap: 1`, `width: '100%'`; header row `space-between` (bold title, dim meta).
+- Progress: an `Svg` (`alt` = "57 of 90 installed", `height: 8`, no `width`), markup
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 8" width="100%" preserveAspectRatio="none">`
+  with a track `<rect width="1000" height="8" rx="4" fill="#808080" fill-opacity="0.25"/>`, an
+  installed segment `fill="#3fa65b"`, and a modified segment `fill="#e0a526"` drawn after it;
+  numbers on the next row as `Text` pieces: the number coloured (`success`, `warning`,
+  `subtle`), the word dim, pieces separated by `gap: 2`.
+- Buttons: labels are verbs with objects (`Install flow-auth`); the main action of a card or
+  view gets `variant: 'primary'`; rows of buttons use `gap: 1` and `justifyContent: 'flex-end'`
+  for per-card actions, `flex-start` for view-level actions. No brackets in labels.
+- Badges: a `Text` with `color` by state (`success` installed, `warning` modified, `subtle`
+  missing, `claude` foreign, `error` problem) in the form `● installed`.
+- Confirm card: `borderColor: 'warning'`, bold question, dim consequence, buttons
+  `Yes, …` (primary) and `Cancel`. Error callout: `borderColor: 'error'`. Success line: `success`.
+- Settings rows: a two-column row per setting: label (dim, fixed `width: 26`) and the `Select`
+  (`flexGrow: 1`); `Custom…` reveals an `Input` on the next row.
+- Pager: row `space-between`: `‹ Previous` (plain), dim `Showing 1-5 of 26`, `Next ›` (plain).
+
+Terminal keeps hotkeys on the tab row and confirm card, uses `━`/`─` bars (`success` and dim)
+sized from `bodyColumns`, and the same card structure with `paddingX: 1`.

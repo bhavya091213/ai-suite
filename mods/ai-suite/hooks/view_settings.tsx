@@ -5,13 +5,11 @@ import { shortenHome } from './cli'
 import type { Command } from './commands'
 import { CUSTOM, NONE, SECTIONS, selectChoice, settingText } from './presets'
 import type { SettingSection, SettingSpec } from './presets'
-import { actButton, buttonRow, card, fit, heading, line, linesOf, note } from './ui'
+import { actButton, actionRow, buttonRow, card, column, entry, fit, heading, line, linesOf } from './ui'
 import type { Env } from './ui'
+import { LABEL_WIDTH, indent, labelCell, note, pickRow } from './ui_parts'
 
-const LABEL_WIDTH = 26
 const OUTPUT_LINES = 14
-
-const label = (text: string): string => text.padEnd(LABEL_WIDTH)
 
 /** Section title and setting label for every key, for the Reset list. */
 const RESET_OPTIONS = [
@@ -29,7 +27,7 @@ function customField(env: Env, spec: SettingSpec, start: string): JSX.Element {
       ? env.dispatch({ key: `custom-cancel:${spec.key}`, command: { kind: 'custom', key: null } })
       : env.dispatch({ key: `set:${spec.key}`, command: { kind: 'set', key: spec.key, value: text.trim() } })
   return (
-    <Box key={`custom-row:${spec.key}`} flexDirection="row" gap={1}>
+    <Box key={`custom-row:${spec.key}`} flexDirection="row" gap={1} {...indent(env)}>
       <Input
         key={`custom-input:${spec.key}`}
         label="Custom"
@@ -45,7 +43,7 @@ function customField(env: Env, spec: SettingSpec, start: string): JSX.Element {
 }
 
 function presetRow(env: Env, spec: SettingSpec, values: AiSuiteConfig): JSX.Element {
-  const { Box, Select } = env.els
+  const { Box } = env.els
   const current = values[spec.key] ?? ''
   const isCustom = env.data.customKey === spec.key
   const choice = selectChoice(spec, current, isCustom)
@@ -58,7 +56,7 @@ function presetRow(env: Env, spec: SettingSpec, values: AiSuiteConfig): JSX.Elem
   }
   return (
     <Box flexDirection="column">
-      <Select key={`set:${spec.key}`} label={label(spec.label)} options={choice.options} value={choice.value} onSelect={onSelect} />
+      {pickRow(env, `set:${spec.key}`, spec.label, { options: choice.options, value: choice.value, onSelect })}
       {isCustom && customField(env, spec, '')}
     </Box>
   )
@@ -66,7 +64,7 @@ function presetRow(env: Env, spec: SettingSpec, values: AiSuiteConfig): JSX.Elem
 
 /** The default vault is the first in `paths.obsidian_vaults`; picking one puts it first and keeps the rest. */
 function vaultRow(env: Env, spec: SettingSpec, values: AiSuiteConfig): JSX.Element {
-  const { Box, Select } = env.els
+  const { Box } = env.els
   const home = env.data.repo?.home ?? ''
   const known = env.data.snapshots.caps.data?.vaults ?? []
   const saved = (values[spec.key] ?? '').split(',').filter(path => path !== '')
@@ -87,13 +85,11 @@ function vaultRow(env: Env, spec: SettingSpec, values: AiSuiteConfig): JSX.Eleme
   }
   return (
     <Box flexDirection="column">
-      <Select
-        key={`set:${spec.key}`}
-        label={label(spec.label)}
-        options={options}
-        value={isCustom ? CUSTOM : current === '' ? NONE : current}
-        onSelect={onSelect}
-      />
+      {pickRow(env, `set:${spec.key}`, spec.label, {
+        options,
+        value: isCustom ? CUSTOM : current === '' ? NONE : current,
+        onSelect,
+      })}
       {isCustom && customField(env, spec, '')}
     </Box>
   )
@@ -105,11 +101,9 @@ function pathRow(env: Env, spec: SettingSpec, values: AiSuiteConfig): JSX.Elemen
   const isCustom = env.data.customKey === spec.key
   return (
     <Box flexDirection="column">
-      <Box flexDirection="row" gap={1} justifyContent="space-between">
+      <Box flexDirection="row" gap={env.isDesktop ? 2 : 1} justifyContent="space-between" alignItems="center">
         <Box flexDirection="row">
-          <Box width={LABEL_WIDTH}>
-            <Text wrap="truncate">{spec.label}</Text>
-          </Box>
+          {labelCell(env, spec.label)}
           <Text wrap="truncate">{fit(env, current, LABEL_WIDTH + 14)}</Text>
         </Box>
         {actButton(env, { key: `change:${spec.key}`, command: { kind: 'custom', key: isCustom ? null : spec.key } }, isCustom ? 'Close' : 'Change…')}
@@ -130,13 +124,12 @@ function sectionCard(env: Env, section: SettingSection, values: AiSuiteConfig): 
     `section:${section.id}`,
     null,
     heading(env, section.title),
-    ...section.settings.map(spec => settingRow(env, spec, values)),
+    entry(env, ...section.settings.map(spec => settingRow(env, spec, values))),
   )
 }
 
 /** Apply (a confirm card first) and the reset list (every key, then a confirm card). */
 function footerCard(env: Env): JSX.Element {
-  const { Box, Select } = env.els
   const reset = (key: string): Promise<void> =>
     key === NONE
       ? Promise.resolve()
@@ -147,10 +140,8 @@ function footerCard(env: Env): JSX.Element {
     null,
     heading(env, 'Apply and reset'),
     line(env, 'Picks are saved as you make them. Apply copies them into the tools on this machine.', 'dim'),
-    <Box flexDirection="row" gap={2}>
-      {actButton(env, { key: 'apply', command: { kind: 'apply' }, confirm: true }, 'Apply to this machine…', { primary: true })}
-      <Select key="reset-setting" label="Reset" options={RESET_OPTIONS} value={NONE} onSelect={reset} />
-    </Box>,
+    actionRow(env, actButton(env, { key: 'apply', command: { kind: 'apply' }, confirm: true }, 'Apply to this machine…', { primary: true })),
+    pickRow(env, 'reset-setting', 'Reset', { options: RESET_OPTIONS, value: NONE, onSelect: reset }),
   )
 }
 
@@ -164,8 +155,11 @@ function applyOutput(env: Env): JSX.Element | null {
     'apply-output',
     null,
     heading(env, 'Apply output'),
-    ...all.slice(0, OUTPUT_LINES).map(each => <Text wrap="truncate">{each}</Text>),
-    all.length > OUTPUT_LINES && <Text dimColor>{`… ${all.length - OUTPUT_LINES} more lines`}</Text>,
+    entry(
+      env,
+      ...all.slice(0, OUTPUT_LINES).map(each => <Text wrap="truncate">{each}</Text>),
+      all.length > OUTPUT_LINES && <Text dimColor>{`… ${all.length - OUTPUT_LINES} more lines`}</Text>,
+    ),
     buttonRow(env, actButton(env, { key: 'close-apply', command: { kind: 'close-detail' } }, 'Close')),
   )
 }
@@ -186,7 +180,7 @@ export function settings(env: Env): JSX.Element {
   const { config, configFile } = env.data.snapshots
   const values = config.data
   return (
-    <Box flexDirection="column">
+    <Box {...column(env)}>
       {note(env, config, 'settings')}
       {configFile.data !== null && !configFile.data.exists && missingConfig(env, configFile.data.path)}
       {values !== null && SECTIONS.map(section => sectionCard(env, section, values))}

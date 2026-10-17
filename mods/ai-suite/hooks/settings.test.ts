@@ -2,7 +2,7 @@
 // The Settings view on both surfaces: a Select per setting with the preset options, picks written
 // at once with `config set`, Custom… fields, the missing-config callout, Apply and Reset.
 import { expect, test } from 'claude-code/testing'
-import { AT_REPO, CONFIG, SURFACES, bad, json, labelOf, openTo, textCount } from './testkit'
+import { AT_REPO, CONFIG, SURFACES, bad, exact, isDesktop, json, labelOf, openTo, textCount } from './testkit'
 
 type Choice = { value: string; label?: string }
 
@@ -37,6 +37,11 @@ for (const surface of SURFACES) {
       expect([key, choices?.map(choice => choice.value)]).toEqual([key, options])
       expect([key, found?.props.value]).toEqual([key, selected])
     }
+    // the terminal puts the label in the Select; the desktop draws it as a dim cell beside it
+    const claude = await ui.find({ key: 'set:tools.claude' })
+    expect(claude?.props.label).toBe(isDesktop(surface) ? undefined : 'Claude Code'.padEnd(26))
+    expect(await textCount(ui, /^Claude Code$/)).toBe(isDesktop(surface) ? 1 : 0)
+    expect((await ui.find({ type: 'Text', text: /^Claude Code$/ }))?.props.dimColor).toBe(isDesktop(surface) ? true : undefined)
     // a current value outside the presets is shown, first; budgets are labelled 50k..200k
     const model = (await ui.find({ key: 'set:subagents.codex.model' }))?.props.options as Choice[]
     expect(model[0]).toEqual({ value: 'astra', label: 'astra (current)' })
@@ -126,7 +131,7 @@ for (const surface of SURFACES) {
     const { w, ui, after } = await openTo($, on, surface, { hasConfig: false })
 
     expect(await labelOf(ui, 'overview-setup')).toBe('Set up this machine')
-    expect(await textCount(ui, /^• No config\.json yet: settings use the defaults$/)).toBe(1)
+    expect(await textCount(ui, exact(`${isDesktop(surface) ? '' : '• '}No config.json yet: settings use the defaults`))).toBe(1)
     await ui.press({ key: 'overview-setup' })
     expect(await textCount(ui, /^No config\.json yet$/)).toBe(1)
     expect(await labelOf(ui, 'create-config')).toBe('Create it with defaults')

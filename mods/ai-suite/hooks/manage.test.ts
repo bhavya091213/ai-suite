@@ -2,7 +2,7 @@
 // Installed, Updates, Workflows and Doctor on both surfaces: cards, badges, link dots, filters,
 // the confirm card before Retire / Pull / Update / Push, file lists and previews.
 import { expect, test } from 'claude-code/testing'
-import { AT_REPO, SURFACES, buttonKeys, isActive, labelOf, openTo, textCount } from './testkit'
+import { AT_REPO, SURFACES, badgeText, buttonKeys, exact, isActive, isDesktop, labelOf, openTo, textCount } from './testkit'
 
 for (const surface of SURFACES) {
   test(`${surface}: Installed shows state badges, link dots and the buttons each card needs, and filters`, AT_REPO, async ($, on) => {
@@ -10,19 +10,30 @@ for (const surface of SURFACES) {
 
     expect(await labelOf(ui, 'installed-filter:tool-managed')).toBe('Tool-managed')
     expect(await isActive(ui, 'All')).toBe(true)
-    expect(await textCount(ui, /^✓ installed$/)).toBe(2)
-    expect(await textCount(ui, /^≠ modified$/)).toBe(1)
-    expect(await textCount(ui, /^\? foreign$/)).toBe(1)
-    expect(await textCount(ui, /^⚙ tool-managed$/)).toBe(1)
-    expect(await textCount(ui, /^! problem$/)).toBe(2)
-    expect(await textCount(ui, /^\[shared\]$/)).toBe(2)
+    const badge = (text: string) => exact(badgeText(surface, text))
+    expect(await textCount(ui, badge('✓ installed'))).toBe(2)
+    expect(await textCount(ui, badge('≠ modified'))).toBe(1)
+    expect(await textCount(ui, badge('? foreign'))).toBe(1)
+    expect(await textCount(ui, badge('⚙ tool-managed'))).toBe(1)
+    expect(await textCount(ui, badge('! problem'))).toBe(2)
+    expect(await textCount(ui, exact(isDesktop(surface) ? 'shared' : '[shared]'))).toBe(2)
     expect(await textCount(ui, /^alpha skill$/)).toBe(1)
     expect(await textCount(ui, /^! claude: real directory shadows the shared skill$/)).toBe(1)
+    // the desktop colours its badges by the theme: installed green, modified amber, foreign Claude's, problem red
+    if (isDesktop(surface)) {
+      const colour = async (text: string) => (await ui.find({ type: 'Text', text: badge(text) }))?.props.color
+      expect([await colour('✓ installed'), await colour('≠ modified'), await colour('? foreign'), await colour('! problem')]).toEqual([
+        'success',
+        'warning',
+        'claude',
+        'error',
+      ])
+    }
 
-    // claude ● codex ● on shared cards: green ok, red broken
+    // claude ● codex ● on shared cards: green ok, red broken (the desktop's status strip adds one red ● for the issues)
     const dots = await ui.findAll({ type: 'Text', text: /^●$/ })
     expect(dots.filter(dot => dot.props.color === 'success')).toHaveLength(3)
-    expect(dots.filter(dot => dot.props.color === 'error')).toHaveLength(1)
+    expect(dots.filter(dot => dot.props.color === 'error')).toHaveLength(isDesktop(surface) ? 2 : 1)
 
     const keys = await buttonKeys(ui)
     for (const wanted of ['update:shared/beta', 'relink:shared/beta', 'retire:shared/alpha', 'files:shared/beta', 'retire:claude/ghost']) {
@@ -123,8 +134,8 @@ for (const surface of SURFACES) {
   test(`${surface}: Workflows has cards with a SKILL.md preview and Retire / Push ask first; Doctor draws rows and tools`, AT_REPO, async ($, on) => {
     const { w, ui, after } = await openTo($, on, surface, {}, 'workflows')
 
-    expect(await textCount(ui, /^✓ valid$/)).toBe(1)
-    expect(await textCount(ui, /^! invalid$/)).toBe(1)
+    expect(await textCount(ui, exact(badgeText(surface, '✓ valid')))).toBe(1)
+    expect(await textCount(ui, exact(badgeText(surface, '! invalid')))).toBe(1)
     expect(await textCount(ui, /^3 phases · 5 skills$/)).toBe(1)
     expect(await textCount(ui, /^2 phases · 1 skill · phase 2 names a skill that is not installed$/)).toBe(1)
     expect(await textCount(ui, /^Create or edit workflows with \.\/install\.sh \(tab 0\)$/)).toBe(1)

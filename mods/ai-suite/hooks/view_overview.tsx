@@ -1,8 +1,9 @@
 // Overview: one card per scope with a bar, what needs attention, and the primary actions.
 import type { Act } from './commands'
-import { actButton, card, empty, fit, heading, line, note, toneProps } from './ui'
+import { actButton, actionRow, card, column, entry, heading, line } from './ui'
 import type { Env, Tone } from './ui'
-import { barCells, countByScope, missingRows, plural, scopeNumbers, skillCounts } from './summary'
+import { counts, empty, listRow, note, progress } from './ui_parts'
+import { countByScope, missingRows, plural, skillCounts } from './summary'
 import type { ScopeCount } from './summary'
 
 const SCOPES: readonly { id: string; title: string }[] = [
@@ -12,23 +13,18 @@ const SCOPES: readonly { id: string; title: string }[] = [
 ]
 
 function scopeCard(env: Env, scope: { id: string; title: string }, count: ScopeCount | undefined): JSX.Element {
-  const { Box, Text } = env.els
   if (count === undefined) {
     return card(env, `scope:${scope.id}`, null, heading(env, scope.title), line(env, 'Nothing is offered in this scope.', 'dim'))
   }
   const offered = count.installed + count.modified + count.missing
   const present = count.installed + count.modified
-  const cells = barCells(present, offered, env.inner)
   return card(
     env,
     `scope:${scope.id}`,
     null,
     heading(env, scope.title, `${present}/${offered}`),
-    <Box flexDirection="row">
-      {cells.filled > 0 && <Text color="success">{'█'.repeat(cells.filled)}</Text>}
-      {cells.empty > 0 && <Text dimColor>{'░'.repeat(cells.empty)}</Text>}
-    </Box>,
-    line(env, scopeNumbers(count), 'dim'),
+    progress(env, count),
+    counts(env, count),
   )
 }
 
@@ -98,21 +94,15 @@ function attentionItems(env: Env): Item[] {
 }
 
 function attentionCard(env: Env): JSX.Element {
-  const { Box, Text } = env.els
   const items = attentionItems(env)
   return card(
     env,
     'attention',
     null,
     heading(env, 'Needs attention', items.length === 0 ? '' : String(items.length)),
-    ...(items.length === 0
-      ? [line(env, '✓ Nothing needs attention.', 'success')]
-      : items.map(item => (
-          <Box flexDirection="row" justifyContent="space-between" gap={1}>
-            <Text {...toneProps(item.tone)} wrap="truncate">{fit(env, `• ${item.text}`, item.label.length + 6)}</Text>
-            {actButton(env, item.act, item.label)}
-          </Box>
-        ))),
+    items.length === 0
+      ? line(env, '✓ Nothing needs attention.', 'success')
+      : entry(env, ...items.map(item => listRow(env, item.tone, item.text, item.act, item.label))),
   )
 }
 
@@ -120,16 +110,17 @@ export function overview(env: Env): JSX.Element {
   const { Box } = env.els
   const { status, configFile } = env.data.snapshots
   const rows = status.data
-  const counts = rows === null ? [] : countByScope(rows)
+  const found = rows === null ? [] : countByScope(rows)
   const missing = rows === null ? 0 : missingRows(rows).length
   return (
-    <Box flexDirection="column">
+    <Box {...column(env)}>
       {note(env, status, 'status')}
-      {rows !== null && SCOPES.map(scope => scopeCard(env, scope, counts.find(count => count.scope === scope.id)))}
+      {rows !== null && SCOPES.map(scope => scopeCard(env, scope, found.find(count => count.scope === scope.id)))}
       {rows !== null && attentionCard(env)}
       {rows === null && status.error === null && empty(env, 'Reading the skills…')}
-      <Box flexDirection="row" flexWrap="wrap" gap={1}>
-        {missing > 0 &&
+      {actionRow(
+        env,
+        missing > 0 &&
           actButton(
             env,
             {
@@ -139,13 +130,13 @@ export function overview(env: Env): JSX.Element {
             },
             `Install ${missing} missing`,
             { primary: true },
-          )}
-        {actButton(env, { key: 'overview-fetch', command: { kind: 'fetch' } }, 'Check for updates')}
-        {configFile.data !== null &&
+          ),
+        actButton(env, { key: 'overview-fetch', command: { kind: 'fetch' } }, 'Check for updates'),
+        configFile.data !== null &&
           !configFile.data.exists &&
-          actButton(env, { key: 'overview-setup', command: { kind: 'view', view: 'settings' } }, 'Set up this machine')}
-        {actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh')}
-      </Box>
+          actButton(env, { key: 'overview-setup', command: { kind: 'view', view: 'settings' } }, 'Set up this machine'),
+        actButton(env, { key: 'refresh', command: { kind: 'refresh' } }, 'Refresh'),
+      )}
     </Box>
   )
 }
