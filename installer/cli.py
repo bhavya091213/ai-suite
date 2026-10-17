@@ -17,8 +17,8 @@ from typing import Callable, List, Mapping, Optional, Sequence, Tuple
 
 from installer import __version__
 from installer.cli_commands import (
-    cmd_install, cmd_issues, cmd_list, cmd_pull, cmd_push, cmd_relink, cmd_retire,
-    cmd_show, cmd_status, cmd_tree, cmd_update, cmd_updates,
+    cmd_categories, cmd_install, cmd_issues, cmd_list, cmd_pull, cmd_push, cmd_relink,
+    cmd_retire, cmd_show, cmd_status, cmd_tree, cmd_update, cmd_updates,
 )
 from installer.cli_config import (
     EDIT_TARGETS, cmd_caps, cmd_config, cmd_edit, cmd_render, cmd_render_tree, cmd_sections,
@@ -66,6 +66,11 @@ def _scope(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--scope", choices=SCOPES, help="disambiguate a name that exists in several scopes")
 
 
+def _category(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--category", metavar="NAME",
+                        help="only skills in this category (case-insensitive; see the categories command)")
+
+
 def _mutating(parser: argparse.ArgumentParser, dry_run: bool = True) -> None:
     parser.add_argument("-y", "--yes", action="store_true", help="do not ask for confirmation")
     if dry_run:
@@ -83,7 +88,9 @@ def _skill_commands(sub) -> None:
     ):
         parser = _command(sub, name, func, text)
         _scope(parser)
+        _category(parser)
         _json(parser)
+    _json(_command(sub, "categories", cmd_categories, "skill categories with offered and installed counts"))
     _json(_command(sub, "issues", cmd_issues, "duplicates, broken links, foreign entries, bad frontmatter"))
     for name, func, text in (
         ("install", cmd_install, "install skills from the repo (never overwrites)"),

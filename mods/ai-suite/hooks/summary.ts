@@ -9,6 +9,7 @@ import type {
   AiSuiteUpdates,
 } from '../types'
 import { truncate } from './cli'
+import { ALL_CATEGORIES } from './presets'
 
 const SCOPE_ORDER = ['shared', 'claude', 'codex']
 
@@ -187,15 +188,23 @@ export const CARDS_PER_PAGE = 5
 export const missingRows = (rows: readonly AiSuiteSkillRow[]): AiSuiteSkillRow[] =>
   rows.filter(row => row.state === 'not-installed')
 
-/** The missing skills the Install view shows: one scope (or all) and names or descriptions holding the query. */
+/** The categories the rows hold, each once (the Select puts them in order). */
+export const categoriesOf = (rows: readonly AiSuiteSkillRow[]): string[] => [...new Set(rows.map(row => row.category))]
+
+/** True for the `all` pick and for a skill in the picked category. */
+const inCategory = (row: AiSuiteSkillRow, category: string): boolean =>
+  category === ALL_CATEGORIES || row.category === category
+
+/** The missing skills the Install view shows: one scope (or all), one category (or all) and names or descriptions holding the query. */
 export function filterMissing(
   rows: readonly AiSuiteSkillRow[],
-  filters: Pick<AiSuiteFilters, 'installScope' | 'installQuery'>,
+  filters: Pick<AiSuiteFilters, 'installScope' | 'installQuery' | 'installCategory'>,
 ): AiSuiteSkillRow[] {
   const query = filters.installQuery.trim().toLowerCase()
   return missingRows(rows).filter(
     row =>
       (filters.installScope === 'all' || row.scope === filters.installScope) &&
+      inCategory(row, filters.installCategory) &&
       (query === '' ||
         row.name.toLowerCase().includes(query) ||
         row.description.toLowerCase().includes(query)),
@@ -204,12 +213,13 @@ export function filterMissing(
 
 const ON_DISK = ['installed', 'modified', 'foreign', 'ignored']
 
-/** What the Installed view lists for a filter chip; `ignored` rows are the tool-managed ones. */
+/** What the Installed view lists for a filter chip and a category (`all` by default); `ignored` rows are the tool-managed ones. */
 export function filterInstalled(
   rows: readonly AiSuiteSkillRow[],
   filter: AiSuiteInstalledFilter,
+  category: string = ALL_CATEGORIES,
 ): AiSuiteSkillRow[] {
-  const present = rows.filter(row => ON_DISK.includes(row.state))
+  const present = rows.filter(row => ON_DISK.includes(row.state) && inCategory(row, category))
   switch (filter) {
     case 'modified':
       return present.filter(row => row.state === 'modified')

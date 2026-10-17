@@ -151,15 +151,35 @@ export function actButton(env: Env, act: Act, label: string, options: ButtonOpti
   return <Button key={act.key} label={label} {...extra} onPress={press} />
 }
 
+export type ChipItem = { key: string; label: string; isActive: boolean; act: Act }
+
+/** A control that goes with the chips: at their right edge when the row has room for it, under them when not. */
+export type Aside = { key: string; element: JSX.Element; width: number }
+
+/** Cells the pane's own padding takes from a desktop row (two on each side). */
+const DESKTOP_GUTTER = 4
+
 /** A row of plain filter chips; the chosen one is bold and underlined. */
-export function chips(
-  env: Env,
-  items: readonly { key: string; label: string; isActive: boolean; act: Act }[],
-): JSX.Element {
+export function chips(env: Env, items: readonly ChipItem[], aside?: Aside): JSX.Element {
   const { Box } = env.els
-  return (
-    <Box flexDirection="row" flexWrap="wrap" gap={2} {...below(env)}>
+  const row = (look: BoxProps): JSX.Element => (
+    <Box flexDirection="row" flexWrap="wrap" gap={2} {...look}>
       {items.map(item => actButton(env, item.act, item.label, { plain: true, isActive: item.isActive }))}
+    </Box>
+  )
+  if (aside === undefined) return row(below(env))
+  // the labels, two cells after each (between them, and before the aside)
+  const used = items.reduce((sum, item) => sum + item.label.length + 2, 0) + aside.width
+  const isBeside = used <= env.columns - (env.isDesktop ? DESKTOP_GUTTER : 0)
+  return isBeside ? (
+    <Box key={aside.key} flexDirection="row" justifyContent="space-between" alignItems="center" gap={2} {...below(env)}>
+      {row({})}
+      {aside.element}
+    </Box>
+  ) : (
+    <Box key={aside.key} flexDirection="column" {...below(env)}>
+      {row({})}
+      {aside.element}
     </Box>
   )
 }
@@ -228,7 +248,7 @@ export function line(env: Env, text: string, tone: Tone = 'plain'): JSX.Element 
 }
 
 /** A card row's title line: what it is called on the left, its badges or meta on the right (the desktop pushes them apart). */
-export function titleRow(env: Env, left: readonly JSX.Element[], right: readonly JSX.Element[]): JSX.Element {
+export function titleRow(env: Env, left: readonly Child[], right: readonly JSX.Element[]): JSX.Element {
   const { Box } = env.els
   if (!env.isDesktop) {
     return (
@@ -280,6 +300,8 @@ export function badge(env: Env, item: Badge): JSX.Element {
 export type SkillCard = {
   scope: string
   name: string
+  /** Drawn dim after the scope (`shared · Design & UX`); left off when unknown or when the card is too narrow for it. */
+  category?: string
   badges: readonly Badge[]
   /** The second line: the description, or what is wrong. */
   summary: { text: string; tone: Tone }
@@ -288,11 +310,23 @@ export type SkillCard = {
   buttons: readonly Child[]
 }
 
-/** The skill card of the spec: name, scope and state badges; one description line; one button line. */
+/** Room the name keeps on the title line before the category gives way. */
+const NAME_ROOM = 12
+
+/** `· Design & UX`, dim, cut to the room the line has beside the scope, the badges and a short name; null when there is none. */
+function categoryTag(env: Env, spec: SkillCard, taken: number): string | null {
+  if (spec.category === undefined || spec.category === '') return null
+  const room = env.inner - taken - Math.min(spec.name.length, NAME_ROOM) - 1
+  return room < 8 ? null : truncate(`· ${spec.category}`, room)
+}
+
+/** The skill card of the spec: name, scope, category and state badges; one description line; one button line. */
 export function skillCard(env: Env, spec: SkillCard): JSX.Element {
   const { Box, Text } = env.els
   const scope = env.isDesktop ? spec.scope : `[${spec.scope}]`
-  const used = scope.length + spec.badges.reduce((sum, item) => sum + badgeWidth(env, item) + 1, 0) + (env.isDesktop ? 4 : 1)
+  const taken = scope.length + spec.badges.reduce((sum, item) => sum + badgeWidth(env, item) + 1, 0) + (env.isDesktop ? 4 : 1)
+  const tag = categoryTag(env, spec, taken)
+  const used = taken + (tag === null ? 0 : tag.length + 1)
   const buttons = buttonRow(env, ...spec.buttons)
   return card(
     env,
@@ -302,7 +336,11 @@ export function skillCard(env: Env, spec: SkillCard): JSX.Element {
       env,
       titleRow(
         env,
-        [<Text bold wrap="truncate">{fit(env, spec.name, used)}</Text>, <Text dimColor>{scope}</Text>],
+        [
+          <Text bold wrap="truncate">{fit(env, spec.name, used)}</Text>,
+          <Text dimColor>{scope}</Text>,
+          tag !== null && <Text dimColor wrap="truncate">{tag}</Text>,
+        ],
         spec.badges.map(item => badge(env, item)),
       ),
       <Text {...toneProps(spec.summary.tone)} wrap="truncate">{fit(env, spec.summary.text)}</Text>,

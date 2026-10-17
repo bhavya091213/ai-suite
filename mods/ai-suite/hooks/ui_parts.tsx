@@ -5,24 +5,66 @@ import type { SelectProps } from 'claude-code'
 import type { AiSuiteSnapshot } from '../types'
 import { truncate } from './cli'
 import { confirmOf, decodeConfirm } from './commands'
-import type { Act } from './commands'
+import type { Act, CategoryList } from './commands'
+import { ALL_CATEGORIES, categoryOptions } from './presets'
 import type { Page } from './summary'
 import { barSegments, scopeParts } from './summary'
 import type { BarSegments, CountPart, ScopeCount } from './summary'
 import { actButton, buttonRow, below, card, fit, hue, toneProps, wrapText } from './ui'
-import type { Child, Env, Tone } from './ui'
+import type { Aside, Child, Env, Tone } from './ui'
 
 // -------------------------------------------------------------- empties, notes
 
-/** One dim sentence and, if given, the one button that answers it. */
-export function empty(env: Env, text: string, answer?: JSX.Element): JSX.Element {
+/** One dim sentence and, if given, the one button that answers it (`answerWidth` cells are kept for the button). */
+export function empty(env: Env, text: string, answer?: JSX.Element, answerWidth = 16): JSX.Element {
   const { Box, Text } = env.els
   return (
     <Box key="empty" flexDirection="row" gap={env.isDesktop ? 2 : 1} alignItems="center" {...below(env)}>
-      <Text dimColor wrap="truncate">{fit(env, text, answer === undefined ? 0 : 16)}</Text>
+      <Text dimColor wrap="truncate">{fit(env, text, answer === undefined ? 0 : answerWidth)}</Text>
       {answer}
     </Box>
   )
+}
+
+// ------------------------------------------------------------------ categories
+
+const CATEGORY_LABEL = 'Category'
+/** Cells a Select draws around its label and value: the space after the label and the ends of the picker. */
+const SELECT_TRIM = 7
+
+/** What the category Select of a list needs: the categories the list holds and the one picked. */
+export type CategoryPick = { list: CategoryList; present: readonly string[]; current: string }
+
+/**
+ * The `Category` Select that goes with a view's filter chips (`All categories`, then the ones
+ * the rows hold, in canonical order). A pick filters the list and sends its pager back to
+ * page 1 (`category` in actions.ts). Nothing is drawn while the rows hold no category.
+ */
+export function categoryAside(env: Env, pick: CategoryPick): Aside | undefined {
+  if (pick.present.length === 0 && pick.current === ALL_CATEGORIES) return undefined
+  const { Select } = env.els
+  const options = categoryOptions(pick.present, pick.current)
+  const widest = Math.max(...options.map(option => (option.label ?? option.value).length))
+  const key = `category:${pick.list}`
+  const onSelect = (value: string): Promise<void> =>
+    value === pick.current
+      ? Promise.resolve()
+      : env.dispatch({ key, command: { kind: 'category', list: pick.list, value } })
+  return {
+    key: `filters:${pick.list}`,
+    element: <Select key={key} label={CATEGORY_LABEL} options={options} value={pick.current} onSelect={onSelect} />,
+    width: CATEGORY_LABEL.length + widest + SELECT_TRIM,
+  }
+}
+
+/** `No skill in Design & UX matches.` and the button that lifts the category filter. */
+export function categoryEmpty(env: Env, list: CategoryList, category: string): JSX.Element {
+  const answer = actButton(
+    env,
+    { key: `${list}-show-all-categories`, command: { kind: 'category', list, value: ALL_CATEGORIES } },
+    'Show all categories',
+  )
+  return empty(env, `No skill in ${category} matches.`, answer, 24)
 }
 
 /** What a snapshot says before its data can be drawn: not loaded, failed, or older than the last refresh. */

@@ -24,6 +24,7 @@ shared/                     mirrors ~/.agents - single source of truth
   config.example.json       central config; installed to ~/.agents/config.json only when absent
   LOCAL.example.md          your personal rules; installed to ~/.agents/LOCAL.md only when absent
   extras.json               external integrations the installer can detect and install (5)
+  skill-categories.json     skill name -> category, for the installer's filters (read, not installed)
   mcp-servers.json          MCP servers, with per-tool targets (one disabled: figma)
   skill-lock.json           pinned upstream skill provenance
   bin/sync-agents           renders rules, local rules + MCP config into both tools
@@ -264,7 +265,9 @@ shared skills, 23 are vendored from upstream repositories (provenance pinned in
 `shared/skill-lock.json`, each license kept in the skill's folder; see
 [Acknowledgements](#acknowledgements)) and three workflow skills - `skill-forge`,
 `product-design-workflow` and `presentation-workflow` - are authored here. Everything is
-installable one skill at a time from the installer's Skills tab.
+installable one skill at a time from the installer's Skills tab. Every skill also has a category,
+one per section below and kept in `shared/skill-categories.json`, that the installer filters by:
+`./install.sh skills categories` lists them with counts, and `list` / `status` take `--category`.
 
 ### Orchestration, context & harness
 

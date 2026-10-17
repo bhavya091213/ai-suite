@@ -30,7 +30,13 @@ export const VIEWS: readonly { id: AiSuiteView; label: string; hotkey: string }[
   { id: 'doctor', label: 'Doctor', hotkey: 'd' },
 ]
 
-export const DEFAULT_FILTERS: AiSuiteFilters = { installScope: 'all', installQuery: '', installed: 'all' }
+export const DEFAULT_FILTERS: AiSuiteFilters = {
+  installScope: 'all',
+  installQuery: '',
+  installCategory: 'all',
+  installed: 'all',
+  installedCategory: 'all',
+}
 
 export type SnapshotName = keyof AiSuiteSnapshots
 

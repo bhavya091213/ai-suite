@@ -1,5 +1,5 @@
 """Skill and git commands: status, list, issues, tree, show, install, update, retire,
-relink, push, updates, pull.
+relink, push, updates, pull, categories.
 
 Each ``cmd_*`` takes a :class:`~installer.cli_io.Ctx` and returns an exit status.
 Mutating commands build plans with ``installer.core.actions`` and hand them to
@@ -15,9 +15,9 @@ from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from installer.cli_io import (
     EXIT_FAIL, EXIT_OK, Ctx, confirm, dump_json, emit, failure, glyph, print_table,
-    read_text, run_plan, truncate, usage_error, use_unicode, warn,
+    read_text, run_plan, to_jsonable, truncate, usage_error, use_unicode, warn,
 )
-from installer.core import actions, git, skills, tree
+from installer.core import actions, categories, git, skills, tree
 from installer.core import status as status_core
 from installer.core.paths import Paths
 from installer.core.types import (
@@ -98,9 +98,25 @@ def _notes_text(row: SkillStatus) -> str:
     return "  ".join(notes)
 
 
-def _counts_line(world: World, scope: Optional[str]) -> str:
+def _category_filter(ctx: Ctx, cats: categories.Categories) -> Optional[str]:
+    """The canonical category named by ``--category`` (case-insensitive), None without the flag."""
+    wanted = ctx.flag("category", None)
+    if wanted is None:
+        return None
+    for name in cats.order:
+        if name.casefold() == wanted.strip().casefold():
+            return name
+    raise usage_error(f"unknown category: {wanted!r}; choose one of: {', '.join(cats.order)}")
+
+
+def _in_category(rows: Sequence[SkillStatus], cats: categories.Categories,
+                 chosen: Optional[str]) -> Tuple[SkillStatus, ...]:
+    return tuple(r for r in rows if chosen is None or categories.category_of(cats, r.name) == chosen)
+
+
+def _counts_line(statuses: Sequence[SkillStatus], scope: Optional[str]) -> str:
     parts = []
-    for c in status_core.counts(world.statuses):
+    for c in status_core.counts(statuses):
         if scope is None or c.scope == scope:
             parts.append(f"{c.scope}: {c.available} in repo, {c.installed} installed, "
                          f"{c.modified} modified, {c.missing} not installed, "
@@ -111,15 +127,16 @@ def _counts_line(world: World, scope: Optional[str]) -> str:
 def cmd_status(ctx: Ctx) -> int:
     world = load_world(ctx.paths, with_remote=True)
     scope = ctx.flag("scope", None)
-    rows = _scope_rows(world, scope)
+    cats = categories.load(ctx.paths)
+    rows = _in_category(_scope_rows(world, scope), cats, _category_filter(ctx, cats))
     if ctx.flag("json"):
-        dump_json(rows)
+        dump_json([{**to_jsonable(r), "category": categories.category_of(cats, r.name)} for r in rows])
         return EXIT_OK
     table = [(glyph(r.state.value), r.scope, r.name, r.state.value, _links_text(r), _notes_text(r))
              for r in rows]
     print_table(("", "SCOPE", "NAME", "STATE", "LINKS", "NOTES"), table)
     emit("")
-    emit(_counts_line(world, scope))
+    emit(_counts_line(rows, scope))
     return EXIT_OK
 
 
@@ -129,15 +146,37 @@ def _install_label(row: SkillStatus) -> str:
 
 def cmd_list(ctx: Ctx) -> int:
     world = load_world(ctx.paths, with_remote=True)
-    rows = [r for r in _scope_rows(world, ctx.flag("scope", None)) if r.source is not None]
+    cats = categories.load(ctx.paths)
+    rows = [r for r in _in_category(_scope_rows(world, ctx.flag("scope", None)), cats,
+                                    _category_filter(ctx, cats)) if r.source is not None]
     if ctx.flag("json"):
         dump_json([{"scope": r.scope, "name": r.name, "state": r.state, "installed": _install_label(r),
-                    "description": r.description, "path": r.source.path if r.source else None}
+                    "description": r.description, "path": r.source.path if r.source else None,
+                    "category": categories.category_of(cats, r.name)}
                    for r in rows])
         return EXIT_OK
-    table = [(glyph(r.state.value), r.scope, r.name, _install_label(r),
-              truncate(r.description, DESCRIPTION_WIDTH)) for r in rows]
-    print_table(("", "SCOPE", "NAME", "INSTALLED", "DESCRIPTION"), table)
+    table = [(glyph(r.state.value), r.scope, r.name, categories.category_of(cats, r.name),
+              _install_label(r), truncate(r.description, DESCRIPTION_WIDTH)) for r in rows]
+    print_table(("", "SCOPE", "NAME", "CATEGORY", "INSTALLED", "DESCRIPTION"), table)
+    return EXIT_OK
+
+
+def cmd_categories(ctx: Ctx) -> int:
+    """Every category with how many distinct skills the repo offers and how many are on disk
+    (installed or modified in at least one scope). ``--json`` prints
+    [{category, offered, installed}] in display order."""
+    world = load_world(ctx.paths)
+    cats = categories.load(ctx.paths)
+    offered = sorted({r.name for r in world.statuses if r.source is not None})
+    present = sorted({r.name for r in world.statuses
+                      if r.source is not None and r.state in (State.INSTALLED, State.MODIFIED)})
+    on_disk = dict(categories.counts(cats, present))
+    rows = [(category, available, on_disk.get(category, 0))
+            for category, available in categories.counts(cats, offered)]
+    if ctx.flag("json"):
+        dump_json([{"category": c, "offered": o, "installed": i} for c, o, i in rows])
+        return EXIT_OK
+    print_table(("CATEGORY", "OFFERED", "INSTALLED"), [(c, str(o), str(i)) for c, o, i in rows])
     return EXIT_OK
 
 

@@ -71,6 +71,7 @@ function changedCards(env: Env, found: AiSuiteUpdates): JSX.Element {
         return skillCard(env, {
           scope: change.scope,
           name: change.name,
+          ...(row === undefined ? {} : { category: row.category }),
           badges: [badge],
           summary: { text: `${plural(change.files, 'file', 'files')} changed upstream`, tone: 'dim' },
           buttons: [

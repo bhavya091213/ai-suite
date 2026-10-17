@@ -82,7 +82,7 @@ async function openView(
   await setDetail($, null)
   await setCustomKey($, null)
   await clearMessage($)
-  if (installed !== undefined) await patchFilters($, { installed })
+  if (installed !== undefined) await patchFilters($, { installed, installedCategory: 'all' })
   await loadFor($, settings, `Loading ${view}`, view, false)
 }
 
@@ -132,10 +132,15 @@ async function perform($: EngineInterface, settings: Settings, command: Command)
     case 'query':
       await patchFilters($, { installQuery: command.text })
       return setPage($, 'install', 0)
+    case 'category':
+      await patchFilters($, command.list === 'install'
+        ? { installCategory: command.value }
+        : { installedCategory: command.value })
+      return setPage($, command.list, 0)
     case 'install':
       return installOne($, settings, command.row)
     case 'install-all':
-      return installAll($, settings, command.scope, command.query)
+      return installAll($, settings, command.scope, command.query, command.category)
     case 'update':
       return updateOne($, settings, command.row)
     case 'update-changed':

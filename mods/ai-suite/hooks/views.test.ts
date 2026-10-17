@@ -347,7 +347,7 @@ test('parsers tolerate junk, config flattens to dotted keys, and the summaries r
     '57 installed · 6 modified · 26 missing · 0 problems',
   )
   const rows = parseStatus(MANY) ?? []
-  expect(filterMissing(rows, { installScope: 'claude', installQuery: 'EXTRA-3' }).map(row => row.name)).toEqual(['extra-3'])
+  expect(filterMissing(rows, { installScope: 'claude', installQuery: 'EXTRA-3', installCategory: 'all' }).map(row => row.name)).toEqual(['extra-3'])
   expect(statusLineText({ data: null, fetchedAt: null, error: null }, { data: null, fetchedAt: null, error: null })).toBeUndefined()
   expect(checkSummary({ doctor: null, doctorError: 'x', updates: null, updatesError: 'y' })).toBe(
     'skills check: doctor failed (x) · updates failed (y)',

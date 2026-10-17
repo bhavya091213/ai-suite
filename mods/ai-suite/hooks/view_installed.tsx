@@ -1,7 +1,8 @@
 // Installed: every skill on this machine as a card, narrowed by filter chips, with the repairs it offers.
 import type { AiSuiteInstalledFilter, AiSuiteSkillRow } from '../types'
 import { idOf } from './commands'
-import { CARDS_PER_PAGE, filterInstalled, pageOf } from './summary'
+import { ALL_CATEGORIES } from './presets'
+import { CARDS_PER_PAGE, categoriesOf, filterInstalled, pageOf } from './summary'
 import {
   PROBLEM_BADGE,
   STATE_BADGES,
@@ -18,7 +19,7 @@ import {
   toneProps,
 } from './ui'
 import type { Badge, Env, Tone } from './ui'
-import { empty, note, pager } from './ui_parts'
+import { categoryAside, categoryEmpty, empty, note, pager } from './ui_parts'
 
 const FILTER_CHIPS: readonly { value: AiSuiteInstalledFilter; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -82,6 +83,7 @@ function installedCard(env: Env, row: AiSuiteSkillRow): JSX.Element {
   return skillCard(env, {
     scope: row.scope,
     name: row.name,
+    category: row.category,
     badges: row.hasProblem ? [stateBadge, PROBLEM_BADGE] : [stateBadge],
     summary,
     aside: row.scope === 'shared' ? linkDots(env, row) : null,
@@ -100,9 +102,12 @@ function installedCard(env: Env, row: AiSuiteSkillRow): JSX.Element {
 export function installed(env: Env): JSX.Element {
   const { Box } = env.els
   const { status } = env.data.snapshots
-  const { installed: filter } = env.data.filters
+  const { installed: filter, installedCategory: category } = env.data.filters
   const everything = filterInstalled(status.data ?? [], 'all')
-  const shown = filterInstalled(status.data ?? [], filter)
+  const shown = filterInstalled(status.data ?? [], filter, category)
+  // the category is what hides everything when lifting it would show something
+  const isCategoryEmpty =
+    category !== ALL_CATEGORIES && filterInstalled(status.data ?? [], filter).length > 0
   const paged = pageOf(shown, env.data.pages.installed ?? 0, CARDS_PER_PAGE)
   const detail = env.data.detail
   return (
@@ -117,10 +122,12 @@ export function installed(env: Env): JSX.Element {
             isActive: chip.value === filter,
             act: { key: `installed-filter:${chip.value}`, command: { kind: 'state', value: chip.value } },
           })),
+          categoryAside(env, { list: 'installed', present: categoriesOf(everything), current: category }),
         )}
       {status.data !== null && everything.length === 0 &&
         empty(env, 'Nothing is installed yet.', actButton(env, { key: 'installed-open-install', command: { kind: 'view', view: 'install' } }, 'Open Install'))}
-      {everything.length > 0 && shown.length === 0 &&
+      {everything.length > 0 && shown.length === 0 && isCategoryEmpty && categoryEmpty(env, 'installed', category)}
+      {everything.length > 0 && shown.length === 0 && !isCategoryEmpty &&
         empty(env, 'No skill matches this filter.', actButton(env, { key: 'installed-show-all', command: { kind: 'state', value: 'all' } }, 'Show all'))}
       {paged.items.flatMap(row => [
         installedCard(env, row),

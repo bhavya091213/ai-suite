@@ -12,6 +12,9 @@ import { filterMissing, plural, updatable } from './summary'
 
 export type Named = { scope: string; name: string }
 
+/** The two views that filter by category, which are also the ids of their pagers. */
+export type CategoryList = 'install' | 'installed'
+
 export type Command =
   | { kind: 'view'; view: AiSuiteView; installed?: AiSuiteInstalledFilter }
   | { kind: 'refresh' }
@@ -19,8 +22,9 @@ export type Command =
   | { kind: 'scope'; value: AiSuiteScopeFilter }
   | { kind: 'state'; value: AiSuiteInstalledFilter }
   | { kind: 'query'; text: string }
+  | { kind: 'category'; list: CategoryList; value: string }
   | { kind: 'install'; row: Named }
-  | { kind: 'install-all'; scope: AiSuiteScopeFilter; query: string }
+  | { kind: 'install-all'; scope: AiSuiteScopeFilter; query: string; category: string }
   | { kind: 'update'; row: Named }
   | { kind: 'update-changed' }
   | { kind: 'relink'; row: Named }
@@ -98,7 +102,11 @@ export function confirmOf(command: Command, data: PaneData): Confirm {
       }
     }
     case 'install-all': {
-      const count = filterMissing(rows, { installScope: command.scope, installQuery: command.query }).length
+      const count = filterMissing(rows, {
+        installScope: command.scope,
+        installQuery: command.query,
+        installCategory: command.category,
+      }).length
       return {
         question: `Install ${plural(count, 'missing skill', 'missing skills')}?`,
         detail: 'They are copied or linked into place; existing files are never overwritten.',

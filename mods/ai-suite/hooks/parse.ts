@@ -10,6 +10,7 @@ import type {
   AiSuiteUpdates,
   AiSuiteWorkflow,
 } from '../types'
+import { OTHER_CATEGORY } from './presets'
 
 function rec(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -61,6 +62,7 @@ export function parseStatus(raw: unknown): AiSuiteSkillRow[] | null {
       name: str(row.name),
       state,
       description: descriptionOf(row),
+      category: str(row.category).trim() || OTHER_CATEGORY,
       note: hasProblem ? describe(row, bad.length > 0) : '',
       hasSource: rec(row.source) !== null,
       hasProblem,

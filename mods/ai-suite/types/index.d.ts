@@ -26,6 +26,8 @@ export type AiSuiteSkillRow = {
   name: string
   state: string
   description: string
+  /** The installer's category for the skill (Design & UX, Orchestration, ...); `Other` when it sends none. */
+  category: string
   /** The first problem in words (with "(+N more)"), empty when there is none. */
   note: string
   hasSource: boolean
@@ -90,11 +92,13 @@ export type AiSuiteSnapshots = {
 export type AiSuiteScopeFilter = 'all' | 'shared' | 'claude' | 'codex'
 export type AiSuiteInstalledFilter = 'all' | 'modified' | 'problems' | 'foreign' | 'tool-managed'
 
-/** What the Install and Installed views are narrowed to. */
+/** What the Install and Installed views are narrowed to. A category filter is `all` or a category name. */
 export type AiSuiteFilters = {
   installScope: AiSuiteScopeFilter
   installQuery: string
+  installCategory: string
   installed: AiSuiteInstalledFilter
+  installedCategory: string
 }
 
 /** A card shown under a view's list: a skill's file tree, a workflow's SKILL.md, or the apply output. */

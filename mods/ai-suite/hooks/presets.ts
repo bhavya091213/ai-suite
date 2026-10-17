@@ -1,5 +1,6 @@
 // The Settings view as data: which settings it shows, in which sections, and the
-// preset values each Select offers. Free text is only ever reached through `Custom…`.
+// preset values each Select offers. Free text is only ever reached through `Custom…`. The
+// skill categories the Install and Installed views filter by live here too.
 
 /** The option value that reveals a text field. */
 export const CUSTOM = '__custom__'
@@ -144,3 +145,41 @@ export function selectChoice(spec: SettingSpec, current: string, isCustomOpen: b
 
 /** The text `config set` takes for a picked value (an empty setting is empty text). */
 export const settingText = (value: string): string => (value === NONE ? '' : value)
+
+// ------------------------------------------------------------ skill categories
+
+/** The category of a skill the installer gives none (and the last in the list). */
+export const OTHER_CATEGORY = 'Other'
+/** The category Select's value for every category. */
+export const ALL_CATEGORIES = 'all'
+/** The canonical order of the categories: `order` of shared/skill-categories.json. */
+export const CATEGORY_ORDER: readonly string[] = [
+  'Orchestration',
+  'Engineering practice',
+  'Languages & frameworks',
+  'Web, API & data',
+  'Design & UX',
+  'Research & knowledge',
+  'Content & media',
+  'Presentations',
+  'Business & career',
+  OTHER_CATEGORY,
+]
+
+/** Where a category sorts: canonical order, a name the installer added just before Other, Other last. */
+function categoryRank(category: string): number {
+  if (category === OTHER_CATEGORY) return CATEGORY_ORDER.length
+  const at = CATEGORY_ORDER.indexOf(category)
+  return at >= 0 ? at : CATEGORY_ORDER.length - 1
+}
+
+/**
+ * The category Select's options: `All categories`, then the categories `present` in the rows in
+ * canonical order. The `current` pick is kept in the list even when no row has it any more, so
+ * the Select never holds a value it cannot show.
+ */
+export function categoryOptions(present: readonly string[], current: string): Option[] {
+  const wanted = current === ALL_CATEGORIES ? present : [...present, current]
+  const sorted = [...new Set(wanted)].sort((a, b) => categoryRank(a) - categoryRank(b) || a.localeCompare(b))
+  return [{ value: ALL_CATEGORIES, label: 'All categories' }, ...sorted.map(value => ({ value }))]
+}

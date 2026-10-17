@@ -40,6 +40,7 @@ installer/
     git.py               git detection, fetch, ahead/behind, changed paths, ff-pull
     actions.py           plan_* -> Operation lists; apply(ops) -> OpResult list
     tree.py              TreeNode for a directory; flatten for rendering; ascii/unicode renderers
+    categories.py        skill -> category map from shared/skill-categories.json (filters in CLI, TUI and the mod)
   tui/
     listmodel.py         ListModel: cursor/scroll/selection/filter over a sequence (pure, testable)
     draw.py              curses helpers: colors, safe_addstr, boxes, list rows, text pane, glyphs
